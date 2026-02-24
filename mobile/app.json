@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Music Vicinity Matchmaker",
+    "slug": "music-vicinity-matchmaker",
+    "version": "1.0.0",
+    "scheme": "musicvicinity",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Music Vicinity to use your location to find nearby listeners."
+        }
+      ]
+    ]
+  }
+}
