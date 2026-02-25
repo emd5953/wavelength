@@ -38,7 +38,7 @@ export default function ConnectionDetailScreen({
   const loadDetail = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getConnectionDetail(connectionId, userId);
+      const data = await getConnectionDetail(connectionId);
       setDetail(data.connection);
     } catch {
       // silently fail
@@ -63,7 +63,7 @@ export default function ConnectionDetailScreen({
           onPress: async () => {
             setRemoving(true);
             try {
-              await removeConnection(connectionId, userId);
+              await removeConnection(connectionId);
               onRemoved();
             } catch {
               // silently fail

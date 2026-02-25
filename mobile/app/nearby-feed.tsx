@@ -1,27 +1,36 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { GPSModule } from '../src/services/gps';
 import { fetchNearbyFeed, FeedBroadcast } from '../src/services/api';
 import { connectFeedSocket, sendLocationUpdate, disconnectFeedSocket } from '../src/services/feedSocket';
+import { SpotifyAuthModule } from '../src/services/spotifyAuth';
 import BroadcastCard from '../src/components/BroadcastCard';
 
 const DEFAULT_RADIUS = 100;
 const POLL_INTERVAL = 10_000;
 
 export default function NearbyFeedScreen() {
+  const router = useRouter();
   const [broadcasts, setBroadcasts] = useState<FeedBroadcast[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const userId = useRef('current-user');
+  const userId = useRef<string>('');
+
+  useEffect(() => {
+    SpotifyAuthModule.getStoredTokens().then((tokens) => {
+      if (tokens) {
+        userId.current = tokens.accessToken;
+      }
+    });
+  }, []);
 
   const loadFeed = useCallback(async () => {
     try {
       const pos = await GPSModule.getCurrentPosition();
-      const data = await fetchNearbyFeed(pos.latitude, pos.longitude, DEFAULT_RADIUS, userId.current);
+      const data = await fetchNearbyFeed(pos.latitude, pos.longitude, DEFAULT_RADIUS);
       setBroadcasts(data.broadcasts);
       setError(null);
-
-      // Update server with current location for WebSocket geo-subscription
       sendLocationUpdate(userId.current, pos.latitude, pos.longitude, DEFAULT_RADIUS);
     } catch (err) {
       setError('Could not load nearby feed');
@@ -31,7 +40,6 @@ export default function NearbyFeedScreen() {
   }, []);
 
   useEffect(() => {
-    // Connect WebSocket for real-time updates
     connectFeedSocket({
       onBroadcastNew: (broadcast) => {
         setBroadcasts((prev) => {
@@ -76,24 +84,42 @@ export default function NearbyFeedScreen() {
         <Text style={styles.emptySubtext}>
           When someone near you plays music, it will show up here.
         </Text>
+        <View style={styles.navRow}>
+          <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/connections')} accessibilityRole="button">
+            <Text style={styles.navBtnText}>Connections</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/connection-requests')} accessibilityRole="button">
+            <Text style={styles.navBtnText}>Requests</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <FlatList
-      data={broadcasts}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <BroadcastCard
-          broadcast={item}
-          viewerAnonId={userId.current}
-          onOpenComments={(id) => {/* TODO: navigate to comment thread */}}
-          onOpenDM={(anonId) => {/* TODO: navigate to DM screen */}}
-        />
-      )}
-      contentContainerStyle={styles.list}
-    />
+    <View style={{ flex: 1 }}>
+      <View style={styles.navRow}>
+        <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/connections')} accessibilityRole="button">
+          <Text style={styles.navBtnText}>Connections</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/connection-requests')} accessibilityRole="button">
+          <Text style={styles.navBtnText}>Requests</Text>
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        data={broadcasts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <BroadcastCard
+            broadcast={item}
+            viewerAnonId={userId.current}
+            onOpenComments={(id) => router.push(`/comment-thread?broadcastId=${id}`)}
+            onOpenDM={(anonId) => router.push(`/dm?recipientAnonId=${anonId}`)}
+          />
+        )}
+        contentContainerStyle={styles.list}
+      />
+    </View>
   );
 }
 
@@ -123,5 +149,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#d32f2f',
     textAlign: 'center',
+  },
+  navRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  navBtn: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  navBtnText: {
+    fontSize: 13,
+    color: '#333',
+    fontWeight: '500',
   },
 });

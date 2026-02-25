@@ -35,8 +35,8 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
     setLoading(true);
     try {
       const [inc, out] = await Promise.all([
-        getIncomingRequests(userId),
-        getOutgoingRequests(userId),
+        getIncomingRequests(),
+        getOutgoingRequests(),
       ]);
       setIncoming(inc.requests.filter((r) => r.status === 'pending'));
       setOutgoing(out.requests.filter((r) => r.status === 'pending'));

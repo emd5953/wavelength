@@ -31,7 +31,7 @@ export default function ConnectionsListScreen({
   const loadConnections = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getConnections(userId);
+      const data = await getConnections();
       setConnections(data.connections);
     } catch {
       // silently fail

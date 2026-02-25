@@ -5,6 +5,7 @@
 
 import pool from '../db/connection';
 import type { Connection, SpotifyProfile } from '../types';
+import {  } from './spotifyProfileFetcher';
 
 export interface ConnectionListItem {
   id: string;

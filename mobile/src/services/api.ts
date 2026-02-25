@@ -2,7 +2,23 @@
  * API client for the Music Vicinity backend.
  */
 
+import { SpotifyAuthModule } from './spotifyAuth';
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+/**
+ * Authenticated fetch wrapper — injects Bearer token from stored Spotify credentials.
+ */
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const token = await SpotifyAuthModule.getValidToken();
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string>),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return fetch(url, { ...init, headers });
+}
 
 export interface FeedBroadcast {
   id: string;
@@ -24,10 +40,9 @@ export async function fetchNearbyFeed(
   lat: number,
   lng: number,
   radius: number,
-  userId: string,
 ): Promise<FeedResponse> {
-  const url = `${API_BASE}/feed/nearby?lat=${lat}&lng=${lng}&radius=${radius}&userId=${userId}`;
-  const res = await fetch(url);
+  const url = `${API_BASE}/feed/nearby?lat=${lat}&lng=${lng}&radius=${radius}`;
+  const res = await authFetch(url);
   if (!res.ok) throw new Error(`Feed request failed: ${res.status}`);
   return res.json();
 }
@@ -59,7 +74,7 @@ export async function addReaction(
   viewerAnonId: string,
   type: string,
 ): Promise<{ counts: ReactionCount }> {
-  const res = await fetch(`${API_BASE}/social/reactions`, {
+  const res = await authFetch(`${API_BASE}/social/reactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ broadcastId, viewerAnonId, type }),
@@ -69,7 +84,7 @@ export async function addReaction(
 }
 
 export async function getReactionCounts(broadcastId: string): Promise<{ counts: ReactionCount }> {
-  const res = await fetch(`${API_BASE}/social/reactions/${broadcastId}`);
+  const res = await authFetch(`${API_BASE}/social/reactions/${broadcastId}`);
   if (!res.ok) throw new Error(`Get reactions failed: ${res.status}`);
   return res.json();
 }
@@ -79,7 +94,7 @@ export async function addComment(
   authorAnonId: string,
   text: string,
 ): Promise<{ comment: Comment }> {
-  const res = await fetch(`${API_BASE}/social/comments`, {
+  const res = await authFetch(`${API_BASE}/social/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ broadcastId, authorAnonId, text }),
@@ -89,7 +104,7 @@ export async function addComment(
 }
 
 export async function getComments(broadcastId: string): Promise<{ comments: Comment[] }> {
-  const res = await fetch(`${API_BASE}/social/comments/${broadcastId}`);
+  const res = await authFetch(`${API_BASE}/social/comments/${broadcastId}`);
   if (!res.ok) throw new Error(`Get comments failed: ${res.status}`);
   return res.json();
 }
@@ -100,7 +115,7 @@ export async function sendDM(
   text: string,
   includesConnectionRequest: boolean = false,
 ): Promise<{ dm: DMMessage }> {
-  const res = await fetch(`${API_BASE}/social/dms`, {
+  const res = await authFetch(`${API_BASE}/social/dms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ senderAnonId, recipientAnonId, text, includesConnectionRequest }),
@@ -113,7 +128,7 @@ export async function getDMThread(
   participantA: string,
   participantB: string,
 ): Promise<{ messages: DMMessage[] }> {
-  const res = await fetch(`${API_BASE}/social/dms/${participantA}/${participantB}`);
+  const res = await authFetch(`${API_BASE}/social/dms/${participantA}/${participantB}`);
   if (!res.ok) throw new Error(`Get DM thread failed: ${res.status}`);
   return res.json();
 }
@@ -138,13 +153,12 @@ export interface ConnectionData {
 }
 
 export async function sendConnectionRequest(
-  viewerUserId: string,
   broadcasterAnonId: string,
 ): Promise<{ request: ConnectionRequestData }> {
-  const res = await fetch(`${API_BASE}/connections/requests`, {
+  const res = await authFetch(`${API_BASE}/connections/requests`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ viewerUserId, broadcasterAnonId }),
+    body: JSON.stringify({ broadcasterAnonId }),
   });
   if (!res.ok) throw new Error(`Send connection request failed: ${res.status}`);
   return res.json();
@@ -153,7 +167,7 @@ export async function sendConnectionRequest(
 export async function acceptConnectionRequest(
   requestId: string,
 ): Promise<{ connection: ConnectionData }> {
-  const res = await fetch(`${API_BASE}/connections/requests/${requestId}/accept`, {
+  const res = await authFetch(`${API_BASE}/connections/requests/${requestId}/accept`, {
     method: 'POST',
   });
   if (!res.ok) throw new Error(`Accept connection request failed: ${res.status}`);
@@ -163,7 +177,7 @@ export async function acceptConnectionRequest(
 export async function declineConnectionRequest(
   requestId: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/connections/requests/${requestId}/decline`, {
+  const res = await authFetch(`${API_BASE}/connections/requests/${requestId}/decline`, {
     method: 'POST',
   });
   if (!res.ok) throw new Error(`Decline connection request failed: ${res.status}`);
@@ -172,29 +186,25 @@ export async function declineConnectionRequest(
 export async function cancelConnectionRequest(
   requestId: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/connections/requests/${requestId}/cancel`, {
+  const res = await authFetch(`${API_BASE}/connections/requests/${requestId}/cancel`, {
     method: 'POST',
   });
   if (!res.ok) throw new Error(`Cancel connection request failed: ${res.status}`);
 }
 
-export async function getIncomingRequests(
-  userId: string,
-): Promise<{ requests: ConnectionRequestData[] }> {
-  const res = await fetch(`${API_BASE}/connections/requests/incoming/${userId}`);
+export async function getIncomingRequests(): Promise<{ requests: ConnectionRequestData[] }> {
+  const res = await authFetch(`${API_BASE}/connections/requests/incoming`);
   if (!res.ok) throw new Error(`Get incoming requests failed: ${res.status}`);
   return res.json();
 }
 
-export async function getOutgoingRequests(
-  userId: string,
-): Promise<{ requests: ConnectionRequestData[] }> {
-  const res = await fetch(`${API_BASE}/connections/requests/outgoing/${userId}`);
+export async function getOutgoingRequests(): Promise<{ requests: ConnectionRequestData[] }> {
+  const res = await authFetch(`${API_BASE}/connections/requests/outgoing`);
   if (!res.ok) throw new Error(`Get outgoing requests failed: ${res.status}`);
   return res.json();
 }
 
-// --- Connections List / Detail / Remove API (Requirement 7.1, 7.2, 7.3) ---
+// --- Connections List / Detail / Remove API ---
 
 export interface SpotifyProfileData {
   displayName: string;
@@ -219,28 +229,24 @@ export interface ConnectionDetailData {
   createdAt: number;
 }
 
-export async function getConnections(
-  userId: string,
-): Promise<{ connections: ConnectionListItem[] }> {
-  const res = await fetch(`${API_BASE}/connections?userId=${userId}`);
+export async function getConnections(): Promise<{ connections: ConnectionListItem[] }> {
+  const res = await authFetch(`${API_BASE}/connections`);
   if (!res.ok) throw new Error(`Get connections failed: ${res.status}`);
   return res.json();
 }
 
 export async function getConnectionDetail(
   connectionId: string,
-  userId: string,
 ): Promise<{ connection: ConnectionDetailData }> {
-  const res = await fetch(`${API_BASE}/connections/${connectionId}?userId=${userId}`);
+  const res = await authFetch(`${API_BASE}/connections/${connectionId}`);
   if (!res.ok) throw new Error(`Get connection detail failed: ${res.status}`);
   return res.json();
 }
 
 export async function removeConnection(
   connectionId: string,
-  userId: string,
 ): Promise<{ success: boolean }> {
-  const res = await fetch(`${API_BASE}/connections/${connectionId}?userId=${userId}`, {
+  const res = await authFetch(`${API_BASE}/connections/${connectionId}`, {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error(`Remove connection failed: ${res.status}`);
