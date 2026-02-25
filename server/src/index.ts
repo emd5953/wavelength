@@ -3,6 +3,9 @@ import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
 import feedRouter from './routes/feed';
+import socialRouter from './routes/social';
+import connectionsRouter from './routes/connections';
+import accountRouter from './routes/account';
 import { initFeedSocket } from './services/feedSocket';
 
 dotenv.config();
@@ -20,6 +23,9 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/feed', feedRouter);
+app.use('/social', socialRouter);
+app.use('/connections', connectionsRouter);
+app.use('/account', accountRouter);
 
 initFeedSocket(io);
 

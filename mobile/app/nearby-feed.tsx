@@ -84,7 +84,14 @@ export default function NearbyFeedScreen() {
     <FlatList
       data={broadcasts}
       keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <BroadcastCard broadcast={item} />}
+      renderItem={({ item }) => (
+        <BroadcastCard
+          broadcast={item}
+          viewerAnonId={userId.current}
+          onOpenComments={(id) => {/* TODO: navigate to comment thread */}}
+          onOpenDM={(anonId) => {/* TODO: navigate to DM screen */}}
+        />
+      )}
       contentContainerStyle={styles.list}
     />
   );

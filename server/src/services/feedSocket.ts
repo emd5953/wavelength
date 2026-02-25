@@ -8,6 +8,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { getBroadcastsInRadius } from './broadcastService';
 import { validateRadius } from './proximityService';
+import { cleanupSessionData } from './privacyService';
 import type { Broadcast, GeoPosition } from '../types';
 
 interface ClientState {
@@ -29,8 +30,13 @@ export function initFeedSocket(io: SocketIOServer): void {
       });
     });
 
-    socket.on('disconnect', () => {
-      clientStates.delete(socket.id);
+    socket.on('disconnect', async () => {
+      const state = clientStates.get(socket.id);
+      if (state) {
+        // Requirement 8.2: delete location data when session ends
+        await cleanupSessionData(state.userId);
+        clientStates.delete(socket.id);
+      }
     });
   });
 }
