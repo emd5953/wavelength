@@ -184,3 +184,51 @@ cd mobile && npx expo start
 |---|---|
 | `EXPO_PUBLIC_API_URL` | Backend server URL |
 | `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` | Spotify app client ID |
+
+## Location Privacy — Coordinate Fuzzing
+
+Broadcast locations are never exposed at exact GPS coordinates. The server applies a random offset of 100–200m in a random direction before returning feed data to clients. This is done in the `/feed/nearby` route using a Haversine-based offset calculation.
+
+This means:
+- The map view shows the general area where someone is listening, not their exact position
+- Each feed request generates a new random offset, so the pin shifts slightly each time
+- The raw GPS data is only stored server-side and never sent to other clients at full precision
+
+Combined with anonymous broadcast IDs, there is no way for a feed viewer to determine who is listening or exactly where they are.
+
+## Onboarding Flow
+
+First-time users see a 4-slide onboarding sequence before reaching the login screen:
+
+1. **Welcome** — introduces Wavelength and its purpose
+2. **Location-Based Discovery** — explains proximity-based feed and location fuzzing
+3. **Anonymous Connections** — describes the anonymous interaction model
+4. **Privacy** — explains data handling and account deletion
+
+Onboarding completion is stored in `expo-secure-store` under the key `onboarding_complete`. The index screen checks this value on mount and redirects to onboarding if not set. Users can skip onboarding at any time.
+
+## Profile Screen
+
+The profile screen (`/profile`) provides:
+- Display of the user's Spotify display name and email (fetched from Spotify's `/v1/me` endpoint)
+- Navigation back to the feed
+- Logout — clears stored tokens and returns to login
+- Account deletion — prompts for confirmation, then calls `DELETE /account/me` on the server (cascades all user data), clears local tokens and onboarding state
+
+## Map View
+
+The feed supports two view modes toggled via List/Map buttons:
+
+- **List view** — the default, showing broadcast cards in a scrollable list
+- **Map view** — renders a `react-native-maps` MapView centered on the user's current location, with green pins for each nearby broadcast
+
+Tapping a map pin opens a callout showing the album art, track title, and artist name. Pins use the fuzzed coordinates from the server, so they represent the general area rather than exact positions.
+
+The map region is initialized from the user's current GPS position with a tight zoom level (~500m visible area) to match the app's proximity focus.
+
+## Feed Navigation
+
+The feed screen nav bar includes:
+- **List / Map toggle** — switches between feed views, with active state highlighted in green
+- **Connections** — navigates to the connections list
+- **Profile (👤)** — navigates to the profile screen

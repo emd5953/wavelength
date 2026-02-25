@@ -30,6 +30,11 @@ export interface FeedBroadcast {
   startedAt: number;
   timeSinceStart: number;
   createdAt: number;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  tasteScore?: number;
 }
 
 export interface FeedResponse {

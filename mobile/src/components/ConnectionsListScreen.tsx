@@ -90,21 +90,21 @@ export default function ConnectionsListScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { fontSize: 20, fontWeight: 'bold', padding: 16, color: '#333' },
+  container: { flex: 1, backgroundColor: '#121212' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' },
+  header: { fontSize: 20, fontWeight: 'bold', padding: 16, color: '#fff' },
   list: { paddingHorizontal: 12 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     marginVertical: 4,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#1e1e1e',
     borderRadius: 10,
   },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#eee' },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#2a2a2a' },
   cardInfo: { marginLeft: 12, flex: 1 },
-  displayName: { fontSize: 15, fontWeight: 'bold', color: '#333' },
-  since: { fontSize: 12, color: '#999', marginTop: 2 },
-  empty: { textAlign: 'center', color: '#999', marginTop: 32, fontSize: 14 },
+  displayName: { fontSize: 15, fontWeight: 'bold', color: '#fff' },
+  since: { fontSize: 12, color: '#666', marginTop: 2 },
+  empty: { textAlign: 'center', color: '#666', marginTop: 32, fontSize: 14 },
 });

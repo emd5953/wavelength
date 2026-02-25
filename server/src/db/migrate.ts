@@ -1,17 +1,22 @@
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import pool from './connection';
 
 export async function runMigrations(): Promise<void> {
-  const migrationPath = join(__dirname, 'migrations', '001_initial_schema.sql');
-  const sql = readFileSync(migrationPath, 'utf-8');
+  const migrationsDir = join(__dirname, 'migrations');
+  const files = readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
 
-  try {
-    await pool.query(sql);
-    console.log('Migrations applied successfully.');
-  } catch (err) {
-    console.error('Migration failed:', err);
-    throw err;
+  for (const file of files) {
+    const sql = readFileSync(join(migrationsDir, file), 'utf-8');
+    try {
+      await pool.query(sql);
+      console.log(`Migration applied: ${file}`);
+    } catch (err) {
+      console.error(`Migration failed (${file}):`, err);
+      throw err;
+    }
   }
 }
 

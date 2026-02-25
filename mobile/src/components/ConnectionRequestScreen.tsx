@@ -201,17 +201,18 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#121212',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#121212',
   },
   tabs: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#2a2a2a',
   },
   tab: {
     flex: 1,
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
-    color: '#999',
+    color: '#666',
     fontWeight: 'normal',
   },
   activeTabText: {
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 14,
     marginVertical: 4,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#1e1e1e',
     borderRadius: 10,
   },
   cardInfo: {
@@ -249,11 +250,11 @@ const styles = StyleSheet.create({
   anonLabel: {
     fontSize: 15,
     fontWeight: 'normal',
-    color: '#333',
+    color: '#ddd',
   },
   expiry: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
     marginTop: 4,
   },
   cardActions: {
@@ -274,18 +275,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   declineBtn: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#2a2a2a',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
   },
   declineText: {
-    color: '#666',
+    color: '#aaa',
     fontWeight: 'normal',
     fontSize: 13,
   },
   cancelBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#d32f2f',
     paddingHorizontal: 16,
@@ -299,7 +300,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     textAlign: 'center',
-    color: '#999',
+    color: '#666',
     marginTop: 32,
     fontSize: 14,
   },

@@ -18,7 +18,7 @@ export default function LocationRequiredScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Location Access Required</Text>
       <Text style={styles.body}>
-        Music Vicinity Matchmaker needs your location to discover what people
+        Wavelength needs your location to discover what people
         near you are listening to. Without location access, the nearby feed and
         broadcasting features cannot work.
       </Text>
@@ -39,17 +39,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    backgroundColor: '#121212',
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
+    color: '#fff',
   },
   body: {
     fontSize: 16,
     textAlign: 'center',
-    color: '#555',
+    color: '#aaa',
     marginBottom: 24,
     lineHeight: 24,
   },

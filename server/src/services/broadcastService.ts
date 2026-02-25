@@ -93,6 +93,7 @@ export async function getBroadcastsInRadius(
   const query = `
     SELECT
       id,
+      user_id AS "userId",
       anonymous_id AS "anonymousId",
       track_title AS "trackTitle",
       artist_name AS "artistName",
@@ -120,6 +121,7 @@ export async function getBroadcastsInRadius(
 
   return result.rows.map((row: Record<string, unknown>) => ({
     id: row.id as string,
+    userId: row.userId as string,
     anonymousId: row.anonymousId as string,
     trackTitle: row.trackTitle as string,
     artistName: row.artistName as string,

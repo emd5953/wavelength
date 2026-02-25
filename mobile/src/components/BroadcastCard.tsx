@@ -55,7 +55,14 @@ export default function BroadcastCard({
         <View style={styles.info}>
           <Text style={styles.title} numberOfLines={1}>{broadcast.trackTitle}</Text>
           <Text style={styles.artist} numberOfLines={1}>{broadcast.artistName}</Text>
-          <Text style={styles.time}>{formatTimeSince(broadcast.timeSinceStart)}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.time}>{formatTimeSince(broadcast.timeSinceStart)}</Text>
+            {broadcast.tasteScore != null && broadcast.tasteScore > 0 && (
+              <View style={styles.tasteBadge}>
+                <Text style={styles.tasteText}>{broadcast.tasteScore}% match</Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
@@ -105,10 +112,10 @@ const styles = StyleSheet.create({
     padding: 12,
     marginHorizontal: 16,
     marginVertical: 6,
-    backgroundColor: '#fff',
+    backgroundColor: '#1e1e1e',
     borderRadius: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
@@ -130,17 +137,33 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#111',
+    color: '#fff',
   },
   artist: {
     fontSize: 14,
-    color: '#666',
+    color: '#aaa',
     marginTop: 2,
   },
   time: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 4,
+    gap: 8,
+  },
+  tasteBadge: {
+    backgroundColor: '#1DB954',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  tasteText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: 'bold',
   },
   reactions: {
     flexDirection: 'row',
@@ -152,7 +175,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#2a2a2a',
     borderRadius: 16,
   },
   emoji: {
@@ -171,11 +194,11 @@ const styles = StyleSheet.create({
   actionBtn: {
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#2a2a2a',
     borderRadius: 8,
   },
   actionText: {
     fontSize: 13,
-    color: '#333',
+    color: '#ccc',
   },
 });

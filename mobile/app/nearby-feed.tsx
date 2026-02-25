@@ -6,16 +6,24 @@ import { fetchNearbyFeed, FeedBroadcast } from '../src/services/api';
 import { connectFeedSocket, sendLocationUpdate, disconnectFeedSocket } from '../src/services/feedSocket';
 import { SpotifyAuthModule } from '../src/services/spotifyAuth';
 import { startPolling, stopPolling } from '../src/services/spotifyPoller';
+import { startBackgroundLocation } from '../src/services/backgroundLocation';
+import { registerForPushNotifications } from '../src/services/pushNotifications';
 import BroadcastCard from '../src/components/BroadcastCard';
+import FeedMap from '../src/components/FeedMap';
+import * as SecureStore from 'expo-secure-store';
+import { RADIUS_KEY } from './profile';
 
-const DEFAULT_RADIUS = 100;
 const POLL_INTERVAL = 10_000;
+
+type ViewMode = 'list' | 'map';
 
 export default function NearbyFeedScreen() {
   const router = useRouter();
   const [broadcasts, setBroadcasts] = useState<FeedBroadcast[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const userId = useRef<string>('');
 
   const handleLogout = async () => {
@@ -39,12 +47,14 @@ export default function NearbyFeedScreen() {
         return;
       }
       const pos = await GPSModule.getCurrentPosition();
-      const data = await fetchNearbyFeed(pos.latitude, pos.longitude, DEFAULT_RADIUS);
+      setUserLocation({ latitude: pos.latitude, longitude: pos.longitude });
+      const savedRadius = await SecureStore.getItemAsync(RADIUS_KEY);
+      const radius = savedRadius ? Number(savedRadius) : 100;
+      const data = await fetchNearbyFeed(pos.latitude, pos.longitude, radius);
       setBroadcasts(data.broadcasts);
       setError(null);
-      sendLocationUpdate(userId.current, pos.latitude, pos.longitude, DEFAULT_RADIUS);
+      sendLocationUpdate(userId.current, pos.latitude, pos.longitude, radius);
 
-      // Update last known location on server
       const token = await SpotifyAuthModule.getValidToken();
       if (token) {
         fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'}/account/location`, {
@@ -76,6 +86,8 @@ export default function NearbyFeedScreen() {
 
     loadFeed();
     startPolling();
+    startBackgroundLocation().catch(() => {});
+    registerForPushNotifications().catch(() => {});
     const interval = setInterval(loadFeed, POLL_INTERVAL);
 
     return () => {
@@ -87,14 +99,23 @@ export default function NearbyFeedScreen() {
 
   const navRow = (
     <View style={styles.navRow}>
+      <TouchableOpacity
+        style={[styles.navBtn, viewMode === 'list' && styles.activeToggle]}
+        onPress={() => setViewMode('list')}
+      >
+        <Text style={[styles.navBtnText, viewMode === 'list' && styles.activeToggleText]}>List</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.navBtn, viewMode === 'map' && styles.activeToggle]}
+        onPress={() => setViewMode('map')}
+      >
+        <Text style={[styles.navBtnText, viewMode === 'map' && styles.activeToggleText]}>Map</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/connections')}>
         <Text style={styles.navBtnText}>Connections</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/connection-requests')}>
-        <Text style={styles.navBtnText}>Requests</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.navBtn, { backgroundColor: '#ffdddd' }]} onPress={handleLogout}>
-        <Text style={[styles.navBtnText, { color: '#d32f2f' }]}>Logout</Text>
+      <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/profile')}>
+        <Text style={styles.navBtnText}>👤</Text>
       </TouchableOpacity>
     </View>
   );
@@ -129,48 +150,50 @@ export default function NearbyFeedScreen() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#121212' }}>
       {navRow}
-      <FlatList
-        data={broadcasts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <BroadcastCard
-            broadcast={item}
-            viewerAnonId={userId.current}
-            onOpenComments={(id) => router.push(`/comment-thread?broadcastId=${id}`)}
-            onOpenDM={(anonId) => router.push(`/dm?recipientAnonId=${anonId}`)}
-          />
-        )}
-        contentContainerStyle={styles.list}
-      />
+      {viewMode === 'map' ? (
+        <FeedMap broadcasts={broadcasts} userLocation={userLocation} />
+      ) : (
+        <FlatList
+          data={broadcasts}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <BroadcastCard
+              broadcast={item}
+              viewerAnonId={userId.current}
+              onOpenComments={(id) => router.push(`/comment-thread?broadcastId=${id}`)}
+              onOpenDM={(anonId) => router.push(`/dm?recipientAnonId=${anonId}`)}
+            />
+          )}
+          contentContainerStyle={styles.list}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#121212' },
   list: { paddingVertical: 12 },
-  emptyText: { fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center' },
+  emptyText: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
   emptySubtext: { fontSize: 14, color: '#888', textAlign: 'center', marginTop: 8 },
-  errorText: { fontSize: 16, color: '#d32f2f', textAlign: 'center' },
+  errorText: { fontSize: 16, color: '#ff6b6b', textAlign: 'center' },
   navRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 12,
+    gap: 8,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    backgroundColor: '#121212',
   },
   navBtn: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 16,
+    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
-  navBtnText: { fontSize: 13, color: '#333', fontWeight: 'normal' },
+  navBtnText: { fontSize: 13, color: '#ccc', fontWeight: 'normal' },
+  activeToggle: { backgroundColor: '#1DB954' },
+  activeToggleText: { color: '#fff' },
 });

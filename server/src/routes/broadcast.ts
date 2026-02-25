@@ -6,6 +6,7 @@
 import { Router, Request, Response } from 'express';
 import { createBroadcast, removeBroadcast } from '../services/broadcastService';
 import { emitBroadcastNew, emitBroadcastRemoved } from '../services/feedSocket';
+import { sendPushToNearbyUsers } from '../services/pushService';
 import { io } from '../index';
 
 const router = Router();
@@ -26,6 +27,17 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const broadcast = await createBroadcast(userId, track, location);
     await emitBroadcastNew(io, broadcast);
+
+    // Send push notifications to nearby users
+    sendPushToNearbyUsers(
+      userId,
+      location.latitude,
+      location.longitude,
+      500,
+      track.title,
+      track.artist,
+    ).catch(() => {});
+
     res.status(201).json(broadcast);
   } catch (err) {
     console.error('Broadcast creation error:', err);

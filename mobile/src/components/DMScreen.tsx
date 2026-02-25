@@ -84,7 +84,7 @@ export default function DMScreen({ myAnonId, recipientAnonId }: DMScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#121212',
   },
   list: {
     padding: 12,
@@ -97,15 +97,15 @@ const styles = StyleSheet.create({
   },
   mine: {
     alignSelf: 'flex-end',
-    backgroundColor: '#DCF8C6',
+    backgroundColor: '#1a3a2a',
   },
   theirs: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#2a2a2a',
   },
   msgText: {
     fontSize: 14,
-    color: '#333',
+    color: '#ddd',
   },
   connReq: {
     fontSize: 12,
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     textAlign: 'center',
-    color: '#999',
+    color: '#666',
     marginTop: 32,
     fontSize: 14,
   },
@@ -125,26 +125,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#2a2a2a',
   },
   connLabel: {
     fontSize: 13,
-    color: '#666',
+    color: '#aaa',
   },
   inputRow: {
     flexDirection: 'row',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#2a2a2a',
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#444',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 14,
+    color: '#fff',
+    backgroundColor: '#1e1e1e',
   },
   sendBtn: {
     marginLeft: 8,

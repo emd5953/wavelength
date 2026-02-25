@@ -21,6 +21,7 @@ export interface GeoPosition {
 
 export interface Broadcast {
   id: string;
+  userId?: string;
   anonymousId: string;
   trackTitle: string;
   artistName: string;

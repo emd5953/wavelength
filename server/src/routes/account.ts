@@ -35,6 +35,28 @@ router.post('/location', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /account/push-token
+ * Register an Expo push token for notifications.
+ */
+router.post('/push-token', async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const { token } = req.body;
+
+  if (!token || typeof token !== 'string') {
+    res.status(400).json({ error: 'token is required' });
+    return;
+  }
+
+  try {
+    await pool.query('UPDATE users SET push_token = $1 WHERE id = $2', [token, userId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Push token save failed:', err);
+    res.status(500).json({ error: 'Failed to save push token' });
+  }
+});
+
+/**
  * DELETE /account/:userId
  * Deletes the user account and all associated data.
  */

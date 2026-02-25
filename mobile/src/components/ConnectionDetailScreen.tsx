@@ -157,15 +157,15 @@ export default function ConnectionDetailScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { fontSize: 15, color: '#999', marginBottom: 12 },
+  container: { flex: 1, backgroundColor: '#121212' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' },
+  errorText: { fontSize: 15, color: '#666', marginBottom: 12 },
   backLink: { fontSize: 14, color: '#1DB954', fontWeight: 'bold' },
   backBtn: { padding: 16 },
   backText: { fontSize: 14, color: '#1DB954', fontWeight: 'bold' },
   profileHeader: { alignItems: 'center', paddingVertical: 20 },
-  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#eee' },
-  displayName: { fontSize: 20, fontWeight: 'bold', color: '#333', marginTop: 12 },
+  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#2a2a2a' },
+  displayName: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginTop: 12 },
   spotifyBtn: {
     marginTop: 12,
     backgroundColor: '#1DB954',
@@ -175,8 +175,8 @@ const styles = StyleSheet.create({
   },
   spotifyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   section: { paddingHorizontal: 20, marginTop: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 8 },
-  listItem: { fontSize: 14, color: '#555', paddingVertical: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
+  listItem: { fontSize: 14, color: '#aaa', paddingVertical: 4 },
   removeBtn: {
     margin: 20,
     padding: 14,

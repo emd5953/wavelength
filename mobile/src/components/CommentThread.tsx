@@ -71,26 +71,26 @@ export default function CommentThread({ broadcastId, viewerAnonId }: CommentThre
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#121212',
   },
   comment: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#2a2a2a',
   },
   author: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
     marginBottom: 2,
   },
   text: {
     fontSize: 14,
-    color: '#333',
+    color: '#ddd',
   },
   empty: {
     textAlign: 'center',
-    color: '#999',
+    color: '#666',
     marginTop: 32,
     fontSize: 14,
   },
@@ -98,16 +98,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#2a2a2a',
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#444',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 14,
+    color: '#fff',
+    backgroundColor: '#1e1e1e',
   },
   sendBtn: {
     marginLeft: 8,
