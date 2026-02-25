@@ -232,3 +232,76 @@ The feed screen nav bar includes:
 - **List / Map toggle** — switches between feed views, with active state highlighted in green
 - **Connections** — navigates to the connections list
 - **Profile (👤)** — navigates to the profile screen
+
+
+## Dark Mode
+
+The entire app uses a dark theme with a consistent color palette:
+
+- Background: `#121212` (screens, headers, nav)
+- Card/surface: `#1e1e1e` (broadcast cards, chat bubbles, list items)
+- Elevated surface: `#2a2a2a` (buttons, inputs, reaction pills)
+- Primary text: `#fff`
+- Secondary text: `#aaa` / `#ccc`
+- Muted text: `#666`
+- Accent: `#1DB954` (Spotify green — buttons, active states, badges)
+- Destructive: `#d32f2f` (delete/remove actions)
+
+The Stack navigator in `_layout.tsx` applies dark header styling globally via `screenOptions`. All screens, components, inputs, and chat bubbles follow this palette.
+
+## Discovery Radius Setting
+
+Users can adjust their discovery radius (50m–500m) from the profile screen using a slider (`@react-native-community/slider`). The value is persisted in `expo-secure-store` under the key `discovery_radius` and read by the feed screen on each load. The server validates and clamps the radius in `proximityService.ts`.
+
+## Background Location
+
+`backgroundLocation.ts` uses `expo-task-manager` and `expo-location` to keep the user's location updated even when the app is not in the foreground.
+
+- Registers a background task (`wavelength-background-location`) that fires on location changes
+- Configured with `Accuracy.Balanced`, 60-second interval, 50m distance threshold
+- Each update POSTs the new coordinates to `POST /account/location`
+- On Android, shows a persistent foreground service notification
+- On iOS, uses the background location indicator
+
+This ensures the server-side Spotify poller always has a reasonably fresh location for creating broadcasts, even if the user hasn't opened the app recently.
+
+## Push Notifications
+
+Push notifications alert users when someone nearby starts playing music.
+
+**Mobile side (`pushNotifications.ts`):**
+- Requests notification permissions on first feed load
+- Registers an Expo push token via `Notifications.getExpoPushTokenAsync()`
+- Sends the token to `POST /account/push-token` for server storage
+- Configures the notification handler to show alerts with sound
+
+**Server side (`pushService.ts`):**
+- When a new broadcast is created (`POST /broadcasts`), the server queries all users within 500m who have a push token stored
+- Uses PostGIS `ST_DWithin` against each user's `last_latitude`/`last_longitude`
+- Sends notifications via the Expo Push API (`https://exp.host/--/api/v2/push/send`) in batches of 100
+- Notification includes the track title and artist name
+
+**Database:**
+- Migration `002_push_tokens.sql` adds a `push_token TEXT` column to the `users` table
+
+## Music Taste Matching
+
+Wavelength computes a taste similarity score between users based on their Spotify listening history.
+
+**Data collection (`tasteService.ts` — `syncUserTaste`):**
+- On login, the server fetches the user's top 20 artists and top 20 tracks from Spotify's `/v1/me/top/artists` and `/v1/me/top/tracks` (medium-term range)
+- Stored in `user_top_artists` and `user_top_tracks` tables with rank ordering
+
+**Score computation (`tasteService.ts` — `getTasteScore`):**
+- Compares two users' top artists and tracks using case-insensitive matching
+- Shared artists: 3 points each (max 60)
+- Shared tracks: 2 points each (max 40)
+- Total score: 0–100
+
+**Feed integration:**
+- The `/feed/nearby` route computes a taste score between the requesting user and each broadcaster
+- The score is returned as `tasteScore` in the feed response
+- The `BroadcastCard` component displays a green badge (e.g., "42% match") when the score is above 0
+
+**Database:**
+- Migration `003_music_taste.sql` creates `user_top_artists` and `user_top_tracks` tables
