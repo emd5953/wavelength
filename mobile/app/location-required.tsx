@@ -25,8 +25,7 @@ export default function LocationRequiredScreen() {
       <TouchableOpacity
         style={styles.button}
         onPress={openSettings}
-        accessibilityRole="button"
-        accessibilityLabel="Open device settings to enable location access"
+
       >
         <Text style={styles.buttonText}>Open Settings</Text>
       </TouchableOpacity>
@@ -43,7 +42,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -63,6 +62,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });

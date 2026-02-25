@@ -1,3 +1,11 @@
+import * as AuthSession from 'expo-auth-session';
+
+const redirectUri = AuthSession.makeRedirectUri({
+  native: 'wavelength://callback',
+  path: 'callback',
+});
+console.log('REDIRECT URI:', redirectUri);
+
 export const SPOTIFY_CONFIG = {
   clientId: process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID || 'YOUR_SPOTIFY_CLIENT_ID',
   scopes: [
@@ -7,7 +15,7 @@ export const SPOTIFY_CONFIG = {
     'user-read-email',
     'user-read-private',
   ],
-  redirectUri: 'musicvicinity://callback',
+  redirectUri,
   discovery: {
     authorizationEndpoint: 'https://accounts.spotify.com/authorize',
     tokenEndpoint: 'https://accounts.spotify.com/api/token',

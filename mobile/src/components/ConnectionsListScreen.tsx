@@ -92,7 +92,7 @@ export default function ConnectionsListScreen({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { fontSize: 20, fontWeight: '700', padding: 16, color: '#333' },
+  header: { fontSize: 20, fontWeight: 'bold', padding: 16, color: '#333' },
   list: { paddingHorizontal: 12 },
   card: {
     flexDirection: 'row',
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#eee' },
   cardInfo: { marginLeft: 12, flex: 1 },
-  displayName: { fontSize: 15, fontWeight: '600', color: '#333' },
+  displayName: { fontSize: 15, fontWeight: 'bold', color: '#333' },
   since: { fontSize: 12, color: '#999', marginTop: 2 },
   empty: { textAlign: 'center', color: '#999', marginTop: 32, fontSize: 14 },
 });

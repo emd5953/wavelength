@@ -14,6 +14,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { initFeedSocket } from './services/feedSocket';
 import { runMigrations } from './db/migrate';
 import { startScheduler, stopScheduler } from './scheduler';
+import { startSpotifyPoller, stopSpotifyPoller } from './services/spotifyPoller';
 
 dotenv.config();
 
@@ -61,16 +62,19 @@ async function boot() {
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     startScheduler();
+    startSpotifyPoller();
   });
 }
 
 process.on('SIGTERM', () => {
   stopScheduler();
+  stopSpotifyPoller();
   httpServer.close();
 });
 
 process.on('SIGINT', () => {
   stopScheduler();
+  stopSpotifyPoller();
   httpServer.close();
 });
 

@@ -4,9 +4,7 @@ export default function RootLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#1DB954' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: '600' },
+        headerShown: true,
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Music Vicinity' }} />

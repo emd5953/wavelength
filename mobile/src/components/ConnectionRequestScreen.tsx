@@ -225,11 +225,11 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     color: '#999',
-    fontWeight: '500',
+    fontWeight: 'normal',
   },
   activeTabText: {
     color: '#1DB954',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   list: {
     padding: 12,
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   anonLabel: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: 'normal',
     color: '#333',
   },
   expiry: {
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   acceptText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: 'bold',
     fontSize: 13,
   },
   declineBtn: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
   declineText: {
     color: '#666',
-    fontWeight: '500',
+    fontWeight: 'normal',
     fontSize: 13,
   },
   cancelBtn: {
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: '#d32f2f',
-    fontWeight: '500',
+    fontWeight: 'normal',
     fontSize: 13,
   },
   empty: {

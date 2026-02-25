@@ -11,6 +11,10 @@ import pool from '../db/connection';
  * Requirement 8.2: retain GPS coordinates only for active session duration.
  */
 export async function cleanupSessionData(userId: string): Promise<void> {
+  // Skip if not a valid UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(userId)) return;
+
   await pool.query('DELETE FROM broadcasts WHERE user_id = $1', [userId]);
 }
 

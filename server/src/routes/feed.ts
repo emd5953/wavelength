@@ -14,10 +14,10 @@ router.get('/nearby', async (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
   const rawRadius = parseFloat(req.query.radius as string);
-  const userId = req.query.userId as string;
+  const userId = req.userId!;
 
-  if (isNaN(lat) || isNaN(lng) || !userId) {
-    res.status(400).json({ error: 'lat, lng, and userId are required' });
+  if (isNaN(lat) || isNaN(lng)) {
+    res.status(400).json({ error: 'lat and lng are required' });
     return;
   }
 

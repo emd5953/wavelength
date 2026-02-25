@@ -3,6 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { SPOTIFY_CONFIG } from '../config/spotify';
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
 WebBrowser.maybeCompleteAuthSession();
 
 const TOKEN_KEYS = {
@@ -17,49 +19,53 @@ export interface SpotifyTokens {
   expiresAt: number;
 }
 
-/**
- * Spotify OAuth PKCE auth module.
- * Handles login, token persistence, silent refresh, and logout.
- */
 export const SpotifyAuthModule = {
-  /**
-   * Kick off the Spotify OAuth PKCE flow.
-   * Returns tokens on success, null if the user cancels.
-   */
   async login(): Promise<SpotifyTokens | null> {
     const request = new AuthSession.AuthRequest({
       clientId: SPOTIFY_CONFIG.clientId,
       scopes: [...SPOTIFY_CONFIG.scopes],
       redirectUri: SPOTIFY_CONFIG.redirectUri,
-      usePKCE: true,
+      usePKCE: false,
       responseType: AuthSession.ResponseType.Code,
+      extraParams: { show_dialog: 'true' },
     });
 
     const result = await request.promptAsync(SPOTIFY_CONFIG.discovery);
 
     if (result.type !== 'success' || !result.params.code) {
+      console.log('AUTH RESULT:', result.type, result.params);
       return null;
     }
 
-    const tokenResponse = await AuthSession.exchangeCodeAsync(
-      {
-        clientId: SPOTIFY_CONFIG.clientId,
+    console.log('GOT AUTH CODE, sending to server...');
+
+    // Send code to our server to exchange for tokens
+    const res = await fetch(`${API_BASE}/auth/callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         code: result.params.code,
         redirectUri: SPOTIFY_CONFIG.redirectUri,
-        extraParams: { code_verifier: request.codeVerifier! },
-      },
-      SPOTIFY_CONFIG.discovery,
-    );
+      }),
+    });
 
-    const tokens = toSpotifyTokens(tokenResponse);
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Server auth callback failed:', err);
+      return null;
+    }
+
+    const data = await res.json();
+    const tokens: SpotifyTokens = {
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      expiresAt: data.expiresAt,
+    };
+
     await storeTokens(tokens);
     return tokens;
   },
 
-  /**
-   * Silently refresh the access token using the stored refresh token.
-   * Clears stored tokens and returns null on failure.
-   */
   async refreshToken(refreshTokenValue?: string): Promise<SpotifyTokens | null> {
     const rt = refreshTokenValue ?? (await SecureStore.getItemAsync(TOKEN_KEYS.refreshToken));
     if (!rt) {
@@ -68,15 +74,25 @@ export const SpotifyAuthModule = {
     }
 
     try {
-      const tokenResponse = await AuthSession.refreshAsync(
-        {
-          clientId: SPOTIFY_CONFIG.clientId,
-          refreshToken: rt,
-        },
-        SPOTIFY_CONFIG.discovery,
-      );
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: rt }),
+      });
 
-      const tokens = toSpotifyTokens(tokenResponse);
+      if (!res.ok) {
+        await clearTokens();
+        return null;
+      }
+
+      const data = await res.json();
+      const stored = await getStoredTokens();
+      const tokens: SpotifyTokens = {
+        accessToken: data.accessToken,
+        refreshToken: stored?.refreshToken ?? rt,
+        expiresAt: data.expiresAt,
+      };
+
       await storeTokens(tokens);
       return tokens;
     } catch {
@@ -85,10 +101,6 @@ export const SpotifyAuthModule = {
     }
   },
 
-  /**
-   * Get a valid access token — refreshes automatically if expired.
-   * Returns null when re-auth is needed.
-   */
   async getValidToken(): Promise<string | null> {
     const stored = await getStoredTokens();
     if (!stored) return null;
@@ -101,26 +113,14 @@ export const SpotifyAuthModule = {
     return refreshed?.accessToken ?? null;
   },
 
-  /** Clear all stored tokens and end the session. */
   async logout(): Promise<void> {
     await clearTokens();
   },
 
-  /** Read stored tokens (if any). */
   getStoredTokens,
 };
 
 // ── helpers ──────────────────────────────────────────────
-
-function toSpotifyTokens(response: AuthSession.TokenResponse): SpotifyTokens {
-  return {
-    accessToken: response.accessToken,
-    refreshToken: response.refreshToken ?? '',
-    expiresAt: response.issuedAt
-      ? (response.issuedAt + (response.expiresIn ?? 3600)) * 1000
-      : Date.now() + (response.expiresIn ?? 3600) * 1000,
-  };
-}
 
 async function storeTokens(tokens: SpotifyTokens): Promise<void> {
   await SecureStore.setItemAsync(TOKEN_KEYS.accessToken, tokens.accessToken);

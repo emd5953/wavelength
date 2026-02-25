@@ -40,14 +40,12 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Music Vicinity</Text>
+      <Text style={styles.title}>Wavelength</Text>
       <Text style={styles.subtitle}>Discover what people near you are listening to</Text>
       <TouchableOpacity
         style={styles.loginBtn}
         onPress={handleLogin}
         disabled={loggingIn}
-        accessibilityRole="button"
-        accessibilityLabel="Log in with Spotify"
       >
         {loggingIn ? (
           <ActivityIndicator size="small" color="#fff" />
@@ -61,7 +59,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  title: { fontSize: 28, fontWeight: '700', color: '#333', marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#333', marginBottom: 8 },
   subtitle: { fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 32 },
   loginBtn: {
     backgroundColor: '#1DB954',
@@ -71,5 +69,5 @@ const styles = StyleSheet.create({
     minWidth: 200,
     alignItems: 'center',
   },
-  loginText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  loginText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

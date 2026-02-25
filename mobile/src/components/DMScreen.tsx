@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   },
   sendText: {
     color: '#1DB954',
-    fontWeight: '600',
+    fontWeight: 'bold',
     fontSize: 14,
   },
 });

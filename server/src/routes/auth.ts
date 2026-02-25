@@ -16,6 +16,7 @@ const SPOTIFY_ME_URL = 'https://api.spotify.com/v1/me';
  * Exchange Spotify authorization code for tokens, upsert user.
  */
 router.post('/callback', async (req: Request, res: Response) => {
+  console.log('AUTH CALLBACK HIT:', req.body);
   const { code, redirectUri } = req.body;
 
   if (!code || !redirectUri) {
@@ -39,11 +40,13 @@ router.post('/callback', async (req: Request, res: Response) => {
 
     if (!tokenResponse.ok) {
       const err = await tokenResponse.text();
+      console.error('Token exchange failed:', err);
       res.status(400).json({ error: `Token exchange failed: ${err}` });
       return;
     }
 
     const tokenData = await tokenResponse.json();
+    console.log('Token exchange success, got tokens');
     const { access_token, refresh_token, expires_in } = tokenData;
     const expiresAt = new Date(Date.now() + expires_in * 1000);
 
@@ -51,6 +54,8 @@ router.post('/callback', async (req: Request, res: Response) => {
     const meResponse = await fetch(SPOTIFY_ME_URL, {
       headers: { Authorization: `Bearer ${access_token}` },
     });
+
+    console.log('Spotify /me response:', meResponse.status);
 
     if (!meResponse.ok) {
       res.status(400).json({ error: 'Failed to fetch Spotify user profile' });
@@ -78,6 +83,8 @@ router.post('/callback', async (req: Request, res: Response) => {
       refresh_token,
       expiresAt.toISOString(),
     ]);
+
+    console.log('User upserted, id:', result.rows[0].id);
 
     res.json({
       userId: result.rows[0].id,

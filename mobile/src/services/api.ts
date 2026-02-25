@@ -5,6 +5,7 @@
 import { SpotifyAuthModule } from './spotifyAuth';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+console.log('API_BASE:', API_BASE);
 
 /**
  * Authenticated fetch wrapper — injects Bearer token from stored Spotify credentials.

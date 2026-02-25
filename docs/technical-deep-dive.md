@@ -1,0 +1,186 @@
+# Wavelength — Technical Deep Dive
+
+## Architecture Overview
+
+Wavelength is a proximity-based music discovery app. Users who have linked their Spotify accounts automatically broadcast what they're listening to, and other users nearby can see those broadcasts in a live feed.
+
+The system has two main layers:
+- **Mobile client** (React Native / Expo) — handles auth, GPS, and feed display
+- **Backend server** (Node.js / Express) — handles Spotify polling, broadcast management, and real-time updates
+
+## Core Flow
+
+```
+User signs up → Links Spotify → Server stores tokens
+                                      ↓
+                Server polls Spotify every 15s for all users
+                                      ↓
+              User playing music? → Create/update broadcast with last known location
+              Not playing?        → Remove broadcast
+                                      ↓
+              Other users nearby see the broadcast in their feed
+```
+
+## Authentication
+
+1. Mobile app initiates Spotify OAuth (authorization code flow, no PKCE)
+2. User authorizes on Spotify's login page
+3. Mobile app receives auth code, sends it to `POST /auth/callback` on the server
+4. Server exchanges code for access + refresh tokens via Spotify's token endpoint
+5. Server fetches Spotify user profile (`/v1/me`) to get the Spotify user ID
+6. Server upserts the user in the `users` table with encrypted tokens
+7. Server returns the access token to the mobile app for subsequent API calls
+
+The server's auth middleware (`authMiddleware`) validates requests by matching the Bearer token against stored `encrypted_access_token` values in the database.
+
+## Server-Side Spotify Polling
+
+This is the key architectural decision that makes Wavelength work without requiring users to have the app open.
+
+**How it works:**
+- `spotifyPoller.ts` runs on the server, polling every 15 seconds
+- It queries all registered users from the database
+- For each user with a last known location, it calls Spotify's `/v1/me/player/currently-playing`
+- If the user is playing a track, it creates/updates a broadcast in the `broadcasts` table
+- If the user stopped playing, it removes their broadcast
+- Token refresh is handled automatically when tokens expire
+
+**Why server-side polling?**
+- Users don't need the app open to broadcast
+- Once a user has signed up and granted Spotify access, their music shows up automatically
+- The only requirement is a last known location (updated whenever the app is opened)
+
+## Location Handling
+
+Location is a two-part system:
+
+1. **Real-time GPS** — When the app is open, it polls GPS and sends location to `POST /account/location`, updating `last_latitude`, `last_longitude`, and `last_location_at` on the user record
+2. **Last known location** — When the app is closed, the server uses the last stored location for broadcasts
+
+This means a user who was at a coffee shop and closed the app will still show up at that coffee shop as long as they're playing music on Spotify.
+
+## Database Schema (PostGIS)
+
+Key tables:
+- `users` — Spotify credentials, last known location
+- `broadcasts` — Active music broadcasts with PostGIS geography points
+- `reactions` — Emoji reactions on broadcasts
+- `comments` — Text comments on broadcasts
+- `direct_messages` — Anonymous DMs between users
+- `connection_requests` — Pending mutual connection requests
+- `connections` — Accepted connections (identity revealed)
+- `user_settings` — Per-user vicinity radius (50m–500m)
+
+Spatial queries use PostGIS `ST_DWithin` for radius-based broadcast filtering, with a GIST index on the `location` column.
+
+## Real-Time Updates (Socket.IO)
+
+The feed uses a hybrid approach:
+- **HTTP polling** — Mobile app fetches `/feed/nearby` every 10 seconds
+- **WebSocket push** — Server emits `broadcast:new` and `broadcast:removed` events to connected clients within range
+
+The `feedSocket.ts` service maintains a map of connected clients with their last known location and radius. When a new broadcast is created, it checks which connected clients are within range and pushes the update.
+
+## Privacy Model
+
+- Broadcasts are anonymous — each broadcast gets a random UUID as `anonymous_id`
+- GPS coordinates are only stored on active broadcasts and as last known location
+- When a broadcast is removed, its location data is deleted
+- Session cleanup (`privacyService.ts`) removes broadcast data on disconnect
+- Account deletion cascades to all user data (broadcasts, DMs, connections, etc.)
+
+## Mobile App Structure
+
+```
+mobile/
+├── app/                    # Expo Router screens
+│   ├── index.tsx           # Login screen
+│   ├── nearby-feed.tsx     # Main feed (broadcasts nearby)
+│   ├── comment-thread.tsx  # Comments on a broadcast
+│   ├── dm.tsx              # Direct messaging
+│   ├── connections.tsx     # Connections list
+│   ├── connection-detail.tsx
+│   ├── connection-requests.tsx
+│   ├── location-required.tsx
+│   └── _layout.tsx         # Root layout (Stack navigator)
+├── src/
+│   ├── components/         # Reusable UI components
+│   ├── config/spotify.ts   # Spotify OAuth config
+│   └── services/           # API client, auth, GPS, polling, sockets
+```
+
+## Server Structure
+
+```
+server/
+├── src/
+│   ├── db/
+│   │   ├── connection.ts       # PostgreSQL pool
+│   │   ├── migrate.ts          # Migration runner
+│   │   └── migrations/         # SQL migration files
+│   ├── middleware/
+│   │   ├── auth.ts             # Bearer token validation
+│   │   └── errorHandler.ts
+│   ├── routes/
+│   │   ├── auth.ts             # Spotify OAuth callback + refresh
+│   │   ├── feed.ts             # Nearby feed endpoint
+│   │   ├── broadcast.ts        # Create/remove broadcasts
+│   │   ├── social.ts           # Reactions, comments, DMs
+│   │   ├── connections.ts      # Connection requests + management
+│   │   └── account.ts          # Location updates + account deletion
+│   ├── services/
+│   │   ├── broadcastService.ts # Broadcast CRUD + spatial queries
+│   │   ├── spotifyPoller.ts    # Server-side Spotify polling
+│   │   ├── feedSocket.ts       # WebSocket real-time updates
+│   │   ├── privacyService.ts   # Session cleanup + account deletion
+│   │   └── proximityService.ts # Radius validation
+│   ├── scheduler.ts            # Periodic cleanup tasks
+│   └── index.ts                # Express app entry point
+```
+
+## Development Setup
+
+### Prerequisites
+- Node.js 18+
+- PostgreSQL with PostGIS extension
+- Docker (for database via docker-compose)
+- Spotify Developer account with app configured
+
+### Spotify Dashboard Config
+- Redirect URI: `exp://<your-ip>:8081/--/callback` (for Expo Go development)
+- Required scopes: `user-read-currently-playing`, `user-read-playback-state`, `user-top-read`, `user-read-email`, `user-read-private`
+- Users must be whitelisted in development mode (up to 25)
+
+### Running Locally
+```bash
+# Start database
+docker-compose up -d
+
+# Start server
+cd server && npm run dev
+
+# Start mobile app
+cd mobile && npx expo start
+```
+
+### Environment Variables
+
+**Server (`server/.env`):**
+| Variable | Description |
+|---|---|
+| `SPOTIFY_CLIENT_ID` | Spotify app client ID |
+| `SPOTIFY_CLIENT_SECRET` | Spotify app client secret |
+| `DB_HOST` | PostgreSQL host |
+| `DB_PORT` | PostgreSQL port |
+| `DB_NAME` | Database name |
+| `DB_USER` | Database user |
+| `DB_PASSWORD` | Database password |
+| `REDIS_URL` | Redis connection string |
+| `PORT` | Server port (default 3000) |
+| `CORS_ORIGIN` | Allowed CORS origin |
+
+**Mobile (`mobile/.env`):**
+| Variable | Description |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | Backend server URL |
+| `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` | Spotify app client ID |

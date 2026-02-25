@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Music Vicinity Matchmaker",
-    "slug": "music-vicinity-matchmaker",
+    "name": "Wavelength",
+    "slug": "wavelength",
     "version": "1.0.0",
-    "scheme": "musicvicinity",
+    "scheme": "wavelength",
     "plugins": [
       "expo-router",
       "expo-secure-store",
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Music Vicinity to use your location to find nearby listeners."
+          "locationAlwaysAndWhenInUsePermission": "Allow Wavelength to use your location to find nearby listeners."
         }
       ]
     ]
