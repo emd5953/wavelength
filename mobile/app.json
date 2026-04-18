@@ -13,6 +13,9 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Wavelength to use your location to find nearby listeners."
         }
       ]
-    ]
+    ],
+    "web": {
+      "bundler": "metro"
+    }
   }
 }

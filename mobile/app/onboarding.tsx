@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-
-const { width } = Dimensions.get('window');
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -46,19 +44,22 @@ export default function OnboardingScreen() {
   const slide = slides[page];
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.emoji}>{slide.emoji}</Text>
-      <Text style={styles.title}>{slide.title}</Text>
-      <Text style={styles.body}>{slide.body}</Text>
+    <View className="flex-1 justify-center items-center p-8 bg-surface">
+      <Text className="text-6xl mb-6">{slide.emoji}</Text>
+      <Text className="text-2xl font-bold text-white text-center mb-3">{slide.title}</Text>
+      <Text className="text-base text-muted-light text-center leading-6 mb-8">{slide.body}</Text>
 
-      <View style={styles.dots}>
+      <View className="flex-row gap-2 mb-8">
         {slides.map((_, i) => (
-          <View key={i} style={[styles.dot, i === page && styles.activeDot]} />
+          <View
+            key={i}
+            className={`h-2 rounded-full ${i === page ? 'w-6 bg-spotify' : 'w-2 bg-muted-border'}`}
+          />
         ))}
       </View>
 
-      <TouchableOpacity style={styles.btn} onPress={handleNext}>
-        <Text style={styles.btnText}>
+      <TouchableOpacity className="bg-spotify px-12 py-3.5 rounded-3xl mb-4" onPress={handleNext}>
+        <Text className="text-white text-base font-bold">
           {page < slides.length - 1 ? 'Next' : 'Get Started'}
         </Text>
       </TouchableOpacity>
@@ -70,36 +71,11 @@ export default function OnboardingScreen() {
             router.replace('/');
           }}
         >
-          <Text style={styles.skip}>Skip</Text>
+          <Text className="text-muted-dark text-sm">Skip</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#121212',
-  },
-  emoji: { fontSize: 64, marginBottom: 24 },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 12 },
-  body: { fontSize: 16, color: '#aaa', textAlign: 'center', lineHeight: 24, marginBottom: 32 },
-  dots: { flexDirection: 'row', gap: 8, marginBottom: 32 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#444' },
-  activeDot: { backgroundColor: '#1DB954', width: 24 },
-  btn: {
-    backgroundColor: '#1DB954',
-    paddingHorizontal: 48,
-    paddingVertical: 14,
-    borderRadius: 24,
-    marginBottom: 16,
-  },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  skip: { color: '#666', fontSize: 14 },
-});
 
 export { ONBOARDING_KEY };

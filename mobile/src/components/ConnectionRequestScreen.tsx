@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import {
   getIncomingRequests,
   getOutgoingRequests,
@@ -88,14 +88,14 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
   };
 
   const renderIncomingItem = ({ item }: { item: ConnectionRequestData }) => (
-    <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.anonLabel}>Anonymous listener</Text>
-        <Text style={styles.expiry}>{formatTimeLeft(item.expiresAt)}</Text>
+    <View className="flex-row items-center justify-between p-3.5 my-1 bg-surface-card rounded-[10px]">
+      <View className="flex-1">
+        <Text className="text-[15px] text-neutral-300">Anonymous listener</Text>
+        <Text className="text-xs text-muted-dark mt-1">{formatTimeLeft(item.expiresAt)}</Text>
       </View>
-      <View style={styles.cardActions}>
+      <View className="flex-row gap-2">
         <TouchableOpacity
-          style={styles.acceptBtn}
+          className="bg-spotify px-4 py-2 rounded-lg min-w-[70px] items-center"
           onPress={() => handleAccept(item.id)}
           disabled={actionLoading === item.id}
           accessibilityLabel="Accept connection request"
@@ -104,31 +104,31 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
           {actionLoading === item.id ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.acceptText}>Accept</Text>
+            <Text className="text-white font-bold text-[13px]">Accept</Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.declineBtn}
+          className="bg-surface-elevated px-4 py-2 rounded-lg"
           onPress={() => handleDecline(item.id)}
           disabled={actionLoading === item.id}
           accessibilityLabel="Decline connection request"
           accessibilityRole="button"
         >
-          <Text style={styles.declineText}>Decline</Text>
+          <Text className="text-muted-light text-[13px]">Decline</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
   const renderOutgoingItem = ({ item }: { item: ConnectionRequestData }) => (
-    <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.anonLabel}>Pending request</Text>
-        <Text style={styles.expiry}>{formatTimeLeft(item.expiresAt)}</Text>
+    <View className="flex-row items-center justify-between p-3.5 my-1 bg-surface-card rounded-[10px]">
+      <View className="flex-1">
+        <Text className="text-[15px] text-neutral-300">Pending request</Text>
+        <Text className="text-xs text-muted-dark mt-1">{formatTimeLeft(item.expiresAt)}</Text>
       </View>
-      <View style={styles.cardActions}>
+      <View className="flex-row gap-2">
         <TouchableOpacity
-          style={styles.cancelBtn}
+          className="border border-danger px-4 py-2 rounded-lg"
           onPress={() => handleCancel(item.id)}
           disabled={actionLoading === item.id}
           accessibilityLabel="Cancel connection request"
@@ -137,7 +137,7 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
           {actionLoading === item.id ? (
             <ActivityIndicator size="small" color="#d32f2f" />
           ) : (
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text className="text-danger text-[13px]">Cancel</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -146,32 +146,32 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View className="flex-1 justify-center items-center bg-surface">
         <ActivityIndicator size="large" color="#1DB954" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.tabs}>
+    <View className="flex-1 bg-surface">
+      <View className="flex-row border-b border-surface-elevated">
         <TouchableOpacity
-          style={[styles.tab, tab === 'incoming' && styles.activeTab]}
+          className={`flex-1 py-3.5 items-center ${tab === 'incoming' ? 'border-b-2 border-spotify' : ''}`}
           onPress={() => setTab('incoming')}
           accessibilityRole="tab"
           accessibilityState={{ selected: tab === 'incoming' }}
         >
-          <Text style={[styles.tabText, tab === 'incoming' && styles.activeTabText]}>
+          <Text className={`text-sm ${tab === 'incoming' ? 'text-spotify font-bold' : 'text-muted-dark'}`}>
             Incoming{incoming.length > 0 ? ` (${incoming.length})` : ''}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, tab === 'outgoing' && styles.activeTab]}
+          className={`flex-1 py-3.5 items-center ${tab === 'outgoing' ? 'border-b-2 border-spotify' : ''}`}
           onPress={() => setTab('outgoing')}
           accessibilityRole="tab"
           accessibilityState={{ selected: tab === 'outgoing' }}
         >
-          <Text style={[styles.tabText, tab === 'outgoing' && styles.activeTabText]}>
+          <Text className={`text-sm ${tab === 'outgoing' ? 'text-spotify font-bold' : 'text-muted-dark'}`}>
             Outgoing{outgoing.length > 0 ? ` (${outgoing.length})` : ''}
           </Text>
         </TouchableOpacity>
@@ -182,126 +182,22 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
           data={incoming}
           keyExtractor={(item) => item.id}
           renderItem={renderIncomingItem}
-          ListEmptyComponent={<Text style={styles.empty}>No incoming requests</Text>}
-          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <Text className="text-center text-muted-dark mt-8 text-sm">No incoming requests</Text>
+          }
+          contentContainerStyle={{ padding: 12 }}
         />
       ) : (
         <FlatList
           data={outgoing}
           keyExtractor={(item) => item.id}
           renderItem={renderOutgoingItem}
-          ListEmptyComponent={<Text style={styles.empty}>No outgoing requests</Text>}
-          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <Text className="text-center text-muted-dark mt-8 text-sm">No outgoing requests</Text>
+          }
+          contentContainerStyle={{ padding: 12 }}
         />
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#121212',
-  },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#1DB954',
-  },
-  tabText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: 'normal',
-  },
-  activeTabText: {
-    color: '#1DB954',
-    fontWeight: 'bold',
-  },
-  list: {
-    padding: 12,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    marginVertical: 4,
-    backgroundColor: '#1e1e1e',
-    borderRadius: 10,
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  anonLabel: {
-    fontSize: 15,
-    fontWeight: 'normal',
-    color: '#ddd',
-  },
-  expiry: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  acceptBtn: {
-    backgroundColor: '#1DB954',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  acceptText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-  declineBtn: {
-    backgroundColor: '#2a2a2a',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  declineText: {
-    color: '#aaa',
-    fontWeight: 'normal',
-    fontSize: 13,
-  },
-  cancelBtn: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#d32f2f',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  cancelText: {
-    color: '#d32f2f',
-    fontWeight: 'normal',
-    fontSize: 13,
-  },
-  empty: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 32,
-    fontSize: 14,
-  },
-});

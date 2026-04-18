@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import type { FeedBroadcast } from '../services/api';
 
@@ -24,7 +23,7 @@ export default function FeedMap({ broadcasts, userLocation }: FeedMapProps) {
       };
 
   return (
-    <MapView style={styles.map} initialRegion={region}>
+    <MapView className="flex-1" initialRegion={region}>
       {broadcasts.map((b) => {
         if (!b.location) return null;
         return (
@@ -37,13 +36,17 @@ export default function FeedMap({ broadcasts, userLocation }: FeedMapProps) {
             pinColor="#1DB954"
           >
             <Callout>
-              <View style={styles.callout}>
+              <View className="flex-row items-center p-1 max-w-[200px]">
                 {b.albumArtUrl ? (
-                  <Image source={{ uri: b.albumArtUrl }} style={styles.albumArt} />
+                  <Image source={{ uri: b.albumArtUrl }} className="w-10 h-10 rounded" />
                 ) : null}
-                <View style={styles.calloutInfo}>
-                  <Text style={styles.trackTitle} numberOfLines={1}>{b.trackTitle}</Text>
-                  <Text style={styles.artistName} numberOfLines={1}>{b.artistName}</Text>
+                <View className="ml-2 flex-1">
+                  <Text className="text-[13px] font-bold text-gray-900" numberOfLines={1}>
+                    {b.trackTitle}
+                  </Text>
+                  <Text className="text-xs text-muted-dark" numberOfLines={1}>
+                    {b.artistName}
+                  </Text>
                 </View>
               </View>
             </Callout>
@@ -53,12 +56,3 @@ export default function FeedMap({ broadcasts, userLocation }: FeedMapProps) {
     </MapView>
   );
 }
-
-const styles = StyleSheet.create({
-  map: { flex: 1 },
-  callout: { flexDirection: 'row', alignItems: 'center', padding: 4, maxWidth: 200 },
-  albumArt: { width: 40, height: 40, borderRadius: 4 },
-  calloutInfo: { marginLeft: 8, flex: 1 },
-  trackTitle: { fontSize: 13, fontWeight: 'bold', color: '#111' },
-  artistName: { fontSize: 12, color: '#666' },
-});

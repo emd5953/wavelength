@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Switch } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, Switch } from 'react-native';
 import { getDMThread, sendDM } from '../services/api';
 import type { DMMessage } from '../services/api';
 
@@ -36,126 +36,56 @@ export default function DMScreen({ myAnonId, recipientAnonId }: DMScreenProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-surface">
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={[styles.bubble, item.senderAnonId === myAnonId ? styles.mine : styles.theirs]}>
-            <Text style={styles.msgText}>{item.text}</Text>
+          <View
+            className={`max-w-[75%] p-2.5 rounded-xl my-1 ${
+              item.senderAnonId === myAnonId
+                ? 'self-end bg-chat-mine'
+                : 'self-start bg-surface-elevated'
+            }`}
+          >
+            <Text className="text-sm text-neutral-300">{item.text}</Text>
             {item.includesConnectionRequest && (
-              <Text style={styles.connReq}>🤝 Connection request included</Text>
+              <Text className="text-xs text-spotify mt-1">🤝 Connection request included</Text>
             )}
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>Start a conversation</Text>}
-        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <Text className="text-center text-muted-dark mt-8 text-sm">Start a conversation</Text>
+        }
+        contentContainerStyle={{ padding: 12 }}
       />
-      <View style={styles.connRow}>
-        <Text style={styles.connLabel}>Include connection request</Text>
+      <View className="flex-row items-center justify-between px-4 py-2 border-t border-surface-elevated">
+        <Text className="text-[13px] text-muted-light">Include connection request</Text>
         <Switch
           value={includeConnectionReq}
           onValueChange={setIncludeConnectionReq}
           accessibilityLabel="Include connection request with message"
         />
       </View>
-      <View style={styles.inputRow}>
+      <View className="flex-row p-3 border-t border-surface-elevated">
         <TextInput
-          style={styles.input}
+          className="flex-1 border border-muted-border rounded-[20px] px-4 py-2 text-sm text-white bg-surface-card"
           value={text}
           onChangeText={setText}
           placeholder="Type a message..."
+          placeholderTextColor="#666"
           accessibilityLabel="Message input"
         />
         <TouchableOpacity
-          style={styles.sendBtn}
+          className="ml-2 justify-center px-4"
           onPress={handleSend}
           disabled={sending}
           accessibilityLabel="Send message"
           accessibilityRole="button"
         >
-          <Text style={styles.sendText}>Send</Text>
+          <Text className="text-spotify font-bold text-sm">Send</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  list: {
-    padding: 12,
-  },
-  bubble: {
-    maxWidth: '75%',
-    padding: 10,
-    borderRadius: 12,
-    marginVertical: 4,
-  },
-  mine: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#1a3a2a',
-  },
-  theirs: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#2a2a2a',
-  },
-  msgText: {
-    fontSize: 14,
-    color: '#ddd',
-  },
-  connReq: {
-    fontSize: 12,
-    color: '#1DB954',
-    marginTop: 4,
-  },
-  empty: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 32,
-    fontSize: 14,
-  },
-  connRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
-  },
-  connLabel: {
-    fontSize: 13,
-    color: '#aaa',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: '#fff',
-    backgroundColor: '#1e1e1e',
-  },
-  sendBtn: {
-    marginLeft: 8,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  sendText: {
-    color: '#1DB954',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-});

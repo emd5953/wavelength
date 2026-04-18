@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { GPSModule } from '../src/services/gps';
 import { fetchNearbyFeed, FeedBroadcast } from '../src/services/api';
@@ -25,11 +25,6 @@ export default function NearbyFeedScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const userId = useRef<string>('');
-
-  const handleLogout = async () => {
-    await SpotifyAuthModule.logout();
-    router.replace('/');
-  };
 
   useEffect(() => {
     SpotifyAuthModule.getStoredTokens().then((tokens) => {
@@ -98,31 +93,41 @@ export default function NearbyFeedScreen() {
   }, [loadFeed]);
 
   const navRow = (
-    <View style={styles.navRow}>
+    <View className="flex-row justify-center gap-2 py-2.5 px-3 bg-surface">
       <TouchableOpacity
-        style={[styles.navBtn, viewMode === 'list' && styles.activeToggle]}
+        className={`px-3.5 py-2 rounded-lg ${viewMode === 'list' ? 'bg-spotify' : 'bg-surface-elevated'}`}
         onPress={() => setViewMode('list')}
       >
-        <Text style={[styles.navBtnText, viewMode === 'list' && styles.activeToggleText]}>List</Text>
+        <Text className={`text-[13px] ${viewMode === 'list' ? 'text-white' : 'text-neutral-400'}`}>
+          List
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[styles.navBtn, viewMode === 'map' && styles.activeToggle]}
+        className={`px-3.5 py-2 rounded-lg ${viewMode === 'map' ? 'bg-spotify' : 'bg-surface-elevated'}`}
         onPress={() => setViewMode('map')}
       >
-        <Text style={[styles.navBtnText, viewMode === 'map' && styles.activeToggleText]}>Map</Text>
+        <Text className={`text-[13px] ${viewMode === 'map' ? 'text-white' : 'text-neutral-400'}`}>
+          Map
+        </Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/connections')}>
-        <Text style={styles.navBtnText}>Connections</Text>
+      <TouchableOpacity
+        className="bg-surface-elevated px-3.5 py-2 rounded-lg"
+        onPress={() => router.push('/connections')}
+      >
+        <Text className="text-[13px] text-neutral-400">Connections</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/profile')}>
-        <Text style={styles.navBtnText}>👤</Text>
+      <TouchableOpacity
+        className="bg-surface-elevated px-3.5 py-2 rounded-lg"
+        onPress={() => router.push('/profile')}
+      >
+        <Text className="text-[13px] text-neutral-400">👤</Text>
       </TouchableOpacity>
     </View>
   );
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View className="flex-1 justify-center items-center bg-surface">
         <ActivityIndicator size="large" color="#1DB954" />
       </View>
     );
@@ -130,8 +135,8 @@ export default function NearbyFeedScreen() {
 
   if (error) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
+      <View className="flex-1 justify-center items-center p-8 bg-surface">
+        <Text className="text-base text-danger-light text-center">{error}</Text>
         {navRow}
       </View>
     );
@@ -139,9 +144,9 @@ export default function NearbyFeedScreen() {
 
   if (broadcasts.length === 0) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>No listeners nearby</Text>
-        <Text style={styles.emptySubtext}>
+      <View className="flex-1 justify-center items-center p-8 bg-surface">
+        <Text className="text-lg font-bold text-white text-center">No listeners nearby</Text>
+        <Text className="text-sm text-muted text-center mt-2">
           When someone near you plays music, it will show up here.
         </Text>
         {navRow}
@@ -150,7 +155,7 @@ export default function NearbyFeedScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#121212' }}>
+    <View className="flex-1 bg-surface">
       {navRow}
       {viewMode === 'map' ? (
         <FeedMap broadcasts={broadcasts} userLocation={userLocation} />
@@ -166,34 +171,9 @@ export default function NearbyFeedScreen() {
               onOpenDM={(anonId) => router.push(`/dm?recipientAnonId=${anonId}`)}
             />
           )}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={{ paddingVertical: 12 }}
         />
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#121212' },
-  list: { paddingVertical: 12 },
-  emptyText: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
-  emptySubtext: { fontSize: 14, color: '#888', textAlign: 'center', marginTop: 8 },
-  errorText: { fontSize: 16, color: '#ff6b6b', textAlign: 'center' },
-  navRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: '#121212',
-  },
-  navBtn: {
-    backgroundColor: '#2a2a2a',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  navBtnText: { fontSize: 13, color: '#ccc', fontWeight: 'normal' },
-  activeToggle: { backgroundColor: '#1DB954' },
-  activeToggleText: { color: '#fff' },
-});

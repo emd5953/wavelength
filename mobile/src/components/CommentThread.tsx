@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import { getComments, addComment } from '../services/api';
 import type { Comment } from '../services/api';
 
@@ -34,91 +34,41 @@ export default function CommentThread({ broadcastId, viewerAnonId }: CommentThre
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-surface">
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.comment}>
-            <Text style={styles.author}>{item.authorAnonId.slice(0, 8)}</Text>
-            <Text style={styles.text}>{item.text}</Text>
+          <View className="px-4 py-2 border-b border-surface-elevated">
+            <Text className="text-xs text-muted-dark mb-0.5">
+              {item.authorAnonId.slice(0, 8)}
+            </Text>
+            <Text className="text-sm text-neutral-300">{item.text}</Text>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>No comments yet</Text>}
+        ListEmptyComponent={
+          <Text className="text-center text-muted-dark mt-8 text-sm">No comments yet</Text>
+        }
       />
-      <View style={styles.inputRow}>
+      <View className="flex-row p-3 border-t border-surface-elevated">
         <TextInput
-          style={styles.input}
+          className="flex-1 border border-muted-border rounded-[20px] px-4 py-2 text-sm text-white bg-surface-card"
           value={text}
           onChangeText={setText}
           placeholder="Add a comment..."
+          placeholderTextColor="#666"
           accessibilityLabel="Comment input"
         />
         <TouchableOpacity
-          style={styles.sendBtn}
+          className="ml-2 justify-center px-4"
           onPress={handleSend}
           disabled={sending}
           accessibilityLabel="Send comment"
           accessibilityRole="button"
         >
-          <Text style={styles.sendText}>Send</Text>
+          <Text className="text-spotify font-bold text-sm">Send</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  comment: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
-  },
-  author: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
-  },
-  text: {
-    fontSize: 14,
-    color: '#ddd',
-  },
-  empty: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 32,
-    fontSize: 14,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: '#fff',
-    backgroundColor: '#1e1e1e',
-  },
-  sendBtn: {
-    marginLeft: 8,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  sendText: {
-    color: '#1DB954',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-});

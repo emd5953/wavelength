@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, TouchableOpacity } from 'react-native';
 import type { FeedBroadcast, ReactionCount } from '../services/api';
 import { addReaction } from '../services/api';
 
@@ -45,160 +45,77 @@ export default function BroadcastCard({
   };
 
   return (
-    <View style={styles.card} accessibilityRole="summary">
-      <View style={styles.top}>
+    <View
+      className="p-3 mx-4 my-1.5 bg-surface-card rounded-xl shadow-sm shadow-black/20"
+      accessibilityRole="summary"
+    >
+      <View className="flex-row">
         <Image
           source={{ uri: broadcast.albumArtUrl }}
-          style={styles.albumArt}
+          className="w-14 h-14 rounded-lg bg-neutral-200"
           accessibilityLabel={`Album art for ${broadcast.trackTitle}`}
         />
-        <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={1}>{broadcast.trackTitle}</Text>
-          <Text style={styles.artist} numberOfLines={1}>{broadcast.artistName}</Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.time}>{formatTimeSince(broadcast.timeSinceStart)}</Text>
+        <View className="flex-1 ml-3 justify-center">
+          <Text className="text-base font-bold text-white" numberOfLines={1}>
+            {broadcast.trackTitle}
+          </Text>
+          <Text className="text-sm text-muted-light mt-0.5" numberOfLines={1}>
+            {broadcast.artistName}
+          </Text>
+          <View className="flex-row items-center mt-1 gap-2">
+            <Text className="text-xs text-muted-dark">
+              {formatTimeSince(broadcast.timeSinceStart)}
+            </Text>
             {broadcast.tasteScore != null && broadcast.tasteScore > 0 && (
-              <View style={styles.tasteBadge}>
-                <Text style={styles.tasteText}>{broadcast.tasteScore}% match</Text>
+              <View className="bg-spotify px-1.5 py-0.5 rounded-lg">
+                <Text className="text-[10px] text-white font-bold">
+                  {broadcast.tasteScore}% match
+                </Text>
               </View>
             )}
           </View>
         </View>
       </View>
 
-      <View style={styles.reactions}>
+      <View className="flex-row mt-2.5 gap-2">
         {REACTIONS.map((r) => (
           <TouchableOpacity
             key={r.type}
-            style={styles.reactionBtn}
+            className="flex-row items-center px-2 py-1 bg-surface-elevated rounded-2xl"
             onPress={() => handleReaction(r.type)}
             accessibilityLabel={`React with ${r.type}`}
             accessibilityRole="button"
           >
-            <Text style={styles.emoji}>{r.emoji}</Text>
-            {counts[r.type] ? <Text style={styles.count}>{counts[r.type]}</Text> : null}
+            <Text className="text-base">{r.emoji}</Text>
+            {counts[r.type] ? (
+              <Text className="text-xs text-muted-dark ml-1">{counts[r.type]}</Text>
+            ) : null}
           </TouchableOpacity>
         ))}
       </View>
 
-      <View style={styles.actions}>
+      <View className="flex-row mt-2 gap-3">
         {onOpenComments && (
           <TouchableOpacity
-            style={styles.actionBtn}
+            className="py-1.5 px-3 bg-surface-elevated rounded-lg"
             onPress={() => onOpenComments(broadcast.id)}
             accessibilityLabel="View comments"
             accessibilityRole="button"
           >
-            <Text style={styles.actionText}>💬 Comments</Text>
+            <Text className="text-[13px] text-neutral-400">💬 Comments</Text>
           </TouchableOpacity>
         )}
         {onOpenDM && (
           <TouchableOpacity
-            style={styles.actionBtn}
+            className="py-1.5 px-3 bg-surface-elevated rounded-lg"
             onPress={() => onOpenDM(broadcast.anonymousId)}
             accessibilityLabel="Send direct message"
             accessibilityRole="button"
           >
-            <Text style={styles.actionText}>✉️ Message</Text>
+            <Text className="text-[13px] text-neutral-400">✉️ Message</Text>
           </TouchableOpacity>
         )}
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    padding: 12,
-    marginHorizontal: 16,
-    marginVertical: 6,
-    backgroundColor: '#1e1e1e',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  top: {
-    flexDirection: 'row',
-  },
-  albumArt: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: '#eee',
-  },
-  info: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  artist: {
-    fontSize: 14,
-    color: '#aaa',
-    marginTop: 2,
-  },
-  time: {
-    fontSize: 12,
-    color: '#666',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 8,
-  },
-  tasteBadge: {
-    backgroundColor: '#1DB954',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  tasteText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  reactions: {
-    flexDirection: 'row',
-    marginTop: 10,
-    gap: 8,
-  },
-  reactionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 16,
-  },
-  emoji: {
-    fontSize: 16,
-  },
-  count: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
-  },
-  actions: {
-    flexDirection: 'row',
-    marginTop: 8,
-    gap: 12,
-  },
-  actionBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-  },
-  actionText: {
-    fontSize: 13,
-    color: '#ccc',
-  },
-});

@@ -10,7 +10,6 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   ActivityIndicator,
   Linking,
   Alert,
@@ -84,7 +83,7 @@ export default function ConnectionDetailScreen({
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View className="flex-1 justify-center items-center bg-surface">
         <ActivityIndicator size="large" color="#1DB954" />
       </View>
     );
@@ -92,10 +91,10 @@ export default function ConnectionDetailScreen({
 
   if (!detail) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>Connection not found</Text>
+      <View className="flex-1 justify-center items-center bg-surface">
+        <Text className="text-[15px] text-muted-dark mb-3">Connection not found</Text>
         <TouchableOpacity onPress={onBack} accessibilityRole="button">
-          <Text style={styles.backLink}>Go back</Text>
+          <Text className="text-sm text-spotify font-bold">Go back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -104,43 +103,53 @@ export default function ConnectionDetailScreen({
   const { profile } = detail;
 
   return (
-    <ScrollView style={styles.container}>
-      <TouchableOpacity onPress={onBack} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Go back">
-        <Text style={styles.backText}>← Back</Text>
+    <ScrollView className="flex-1 bg-surface">
+      <TouchableOpacity
+        onPress={onBack}
+        className="p-4"
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Text className="text-sm text-spotify font-bold">← Back</Text>
       </TouchableOpacity>
 
-      <View style={styles.profileHeader}>
+      <View className="items-center py-5">
         <Image
           source={{ uri: profile.profileImageUrl }}
-          style={styles.avatar}
+          className="w-24 h-24 rounded-full bg-surface-elevated"
           accessibilityLabel={`${profile.displayName} profile image`}
         />
-        <Text style={styles.displayName}>{profile.displayName}</Text>
-        <TouchableOpacity onPress={handleOpenSpotify} style={styles.spotifyBtn} accessibilityRole="link" accessibilityLabel="Open Spotify profile">
-          <Text style={styles.spotifyBtnText}>Open on Spotify</Text>
+        <Text className="text-xl font-bold text-white mt-3">{profile.displayName}</Text>
+        <TouchableOpacity
+          onPress={handleOpenSpotify}
+          className="mt-3 bg-spotify px-5 py-2.5 rounded-[20px]"
+          accessibilityRole="link"
+          accessibilityLabel="Open Spotify profile"
+        >
+          <Text className="text-white font-bold text-sm">Open on Spotify</Text>
         </TouchableOpacity>
       </View>
 
       {profile.topArtists.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Artists</Text>
+        <View className="px-5 mt-5">
+          <Text className="text-base font-bold text-white mb-2">Top Artists</Text>
           {profile.topArtists.map((artist, i) => (
-            <Text key={i} style={styles.listItem}>{artist}</Text>
+            <Text key={i} className="text-sm text-muted-light py-1">{artist}</Text>
           ))}
         </View>
       )}
 
       {profile.topTracks.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Tracks</Text>
+        <View className="px-5 mt-5">
+          <Text className="text-base font-bold text-white mb-2">Top Tracks</Text>
           {profile.topTracks.map((track, i) => (
-            <Text key={i} style={styles.listItem}>{track}</Text>
+            <Text key={i} className="text-sm text-muted-light py-1">{track}</Text>
           ))}
         </View>
       )}
 
       <TouchableOpacity
-        style={styles.removeBtn}
+        className="m-5 p-3.5 border border-danger rounded-[10px] items-center"
         onPress={handleRemove}
         disabled={removing}
         accessibilityRole="button"
@@ -149,41 +158,9 @@ export default function ConnectionDetailScreen({
         {removing ? (
           <ActivityIndicator size="small" color="#d32f2f" />
         ) : (
-          <Text style={styles.removeText}>Remove Connection</Text>
+          <Text className="text-danger font-bold text-sm">Remove Connection</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' },
-  errorText: { fontSize: 15, color: '#666', marginBottom: 12 },
-  backLink: { fontSize: 14, color: '#1DB954', fontWeight: 'bold' },
-  backBtn: { padding: 16 },
-  backText: { fontSize: 14, color: '#1DB954', fontWeight: 'bold' },
-  profileHeader: { alignItems: 'center', paddingVertical: 20 },
-  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#2a2a2a' },
-  displayName: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginTop: 12 },
-  spotifyBtn: {
-    marginTop: 12,
-    backgroundColor: '#1DB954',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  spotifyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-  section: { paddingHorizontal: 20, marginTop: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
-  listItem: { fontSize: 14, color: '#aaa', paddingVertical: 4 },
-  removeBtn: {
-    margin: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#d32f2f',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  removeText: { color: '#d32f2f', fontWeight: 'bold', fontSize: 14 },
-});

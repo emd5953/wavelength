@@ -3,8 +3,15 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", "src/**/*"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "src/**/*",
+    "nativewind-env.d.ts"
+  ]
 }

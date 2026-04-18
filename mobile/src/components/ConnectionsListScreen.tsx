@@ -10,7 +10,6 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  StyleSheet,
   ActivityIndicator,
 } from 'react-native';
 import { getConnections } from '../services/api';
@@ -46,19 +45,19 @@ export default function ConnectionsListScreen({
 
   const renderItem = ({ item }: { item: ConnectionListItem }) => (
     <TouchableOpacity
-      style={styles.card}
+      className="flex-row items-center p-3 my-1 bg-surface-card rounded-[10px]"
       onPress={() => onSelectConnection(item.id)}
       accessibilityLabel={`View profile of ${item.displayName}`}
       accessibilityRole="button"
     >
       <Image
         source={{ uri: item.profileImageUrl }}
-        style={styles.avatar}
+        className="w-12 h-12 rounded-full bg-surface-elevated"
         accessibilityLabel={`${item.displayName} profile image`}
       />
-      <View style={styles.cardInfo}>
-        <Text style={styles.displayName}>{item.displayName}</Text>
-        <Text style={styles.since}>
+      <View className="ml-3 flex-1">
+        <Text className="text-[15px] font-bold text-white">{item.displayName}</Text>
+        <Text className="text-xs text-muted-dark mt-0.5">
           Connected {new Date(item.createdAt).toLocaleDateString()}
         </Text>
       </View>
@@ -67,44 +66,24 @@ export default function ConnectionsListScreen({
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View className="flex-1 justify-center items-center bg-surface">
         <ActivityIndicator size="large" color="#1DB954" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Connections</Text>
+    <View className="flex-1 bg-surface">
+      <Text className="text-xl font-bold p-4 text-white">Connections</Text>
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={
-          <Text style={styles.empty}>No connections yet</Text>
+          <Text className="text-center text-muted-dark mt-8 text-sm">No connections yet</Text>
         }
-        contentContainerStyle={styles.list}
+        contentContainerStyle={{ paddingHorizontal: 12 }}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' },
-  header: { fontSize: 20, fontWeight: 'bold', padding: 16, color: '#fff' },
-  list: { paddingHorizontal: 12 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginVertical: 4,
-    backgroundColor: '#1e1e1e',
-    borderRadius: 10,
-  },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#2a2a2a' },
-  cardInfo: { marginLeft: 12, flex: 1 },
-  displayName: { fontSize: 15, fontWeight: 'bold', color: '#fff' },
-  since: { fontSize: 12, color: '#666', marginTop: 2 },
-  empty: { textAlign: 'center', color: '#666', marginTop: 32, fontSize: 14 },
-});

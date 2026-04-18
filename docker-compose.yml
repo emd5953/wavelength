@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgis/postgis:16-3.4-alpine
+    image: imresamu/postgis:16-3.4
     environment:
       POSTGRES_DB: music_vicinity
       POSTGRES_USER: postgres

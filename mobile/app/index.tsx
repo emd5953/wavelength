@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { SpotifyAuthModule } from '../src/services/spotifyAuth';
@@ -41,44 +41,30 @@ export default function LoginScreen() {
 
   if (checking) {
     return (
-      <View style={styles.container}>
+      <View className="flex-1 justify-center items-center bg-surface">
         <ActivityIndicator size="large" color="#1DB954" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.emoji}>🎵</Text>
-      <Text style={styles.title}>Wavelength</Text>
-      <Text style={styles.subtitle}>Discover what people near you are listening to</Text>
+    <View className="flex-1 justify-center items-center p-8 bg-surface">
+      <Text className="text-5xl mb-4">🎵</Text>
+      <Text className="text-3xl font-bold text-white mb-2">Wavelength</Text>
+      <Text className="text-base text-muted-light text-center mb-8">
+        Discover what people near you are listening to
+      </Text>
       <TouchableOpacity
-        style={styles.loginBtn}
+        className="bg-spotify px-8 py-3.5 rounded-3xl min-w-[200px] items-center"
         onPress={handleLogin}
         disabled={loggingIn}
       >
         {loggingIn ? (
           <ActivityIndicator size="small" color="#fff" />
         ) : (
-          <Text style={styles.loginText}>Log in with Spotify</Text>
+          <Text className="text-white text-base font-bold">Log in with Spotify</Text>
         )}
       </TouchableOpacity>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#121212' },
-  emoji: { fontSize: 48, marginBottom: 16 },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#aaa', textAlign: 'center', marginBottom: 32 },
-  loginBtn: {
-    backgroundColor: '#1DB954',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 24,
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  loginText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-});

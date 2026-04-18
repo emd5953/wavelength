@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
+import { Text, View, TouchableOpacity, Linking, Platform } from 'react-native';
 
 /**
  * Screen shown when GPS permission is denied.
@@ -15,55 +15,21 @@ export default function LocationRequiredScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Location Access Required</Text>
-      <Text style={styles.body}>
+    <View className="flex-1 justify-center items-center p-8 bg-surface">
+      <Text className="text-[22px] font-bold mb-4 text-center text-white">
+        Location Access Required
+      </Text>
+      <Text className="text-base text-center text-muted-light mb-6 leading-6">
         Wavelength needs your location to discover what people
         near you are listening to. Without location access, the nearby feed and
         broadcasting features cannot work.
       </Text>
       <TouchableOpacity
-        style={styles.button}
+        className="bg-spotify px-6 py-3 rounded-lg"
         onPress={openSettings}
-
       >
-        <Text style={styles.buttonText}>Open Settings</Text>
+        <Text className="text-white text-base font-bold">Open Settings</Text>
       </TouchableOpacity>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#121212',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#fff',
-  },
-  body: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#aaa',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  button: {
-    backgroundColor: '#1DB954',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-});
