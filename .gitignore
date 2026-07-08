@@ -1,5 +1,6 @@
 .kiro
 node_modules
+.expo
 
 # Environment files
 .env
