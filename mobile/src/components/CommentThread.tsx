@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { getComments, addComment } from '../services/api';
 import type { Comment } from '../services/api';
 
@@ -34,41 +34,75 @@ export default function CommentThread({ broadcastId, viewerAnonId }: CommentThre
   };
 
   return (
-    <View className="flex-1 bg-surface">
+    <KeyboardAvoidingView
+      className="flex-1"
+      style={{ backgroundColor: '#1a0a0a' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={90}
+    >
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View className="px-4 py-2 border-b border-surface-elevated">
-            <Text className="text-xs text-muted-dark mb-0.5">
-              {item.authorAnonId.slice(0, 8)}
-            </Text>
-            <Text className="text-sm text-neutral-300">{item.text}</Text>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const isMe = item.authorAnonId === viewerAnonId;
+          return (
+            <View className={`mx-4 my-1 ${isMe ? 'items-end' : 'items-start'}`}>
+              <View
+                className="max-w-[80%] px-4 py-3 rounded-2xl"
+                style={isMe ? {
+                  backgroundColor: 'rgba(220,38,38,0.2)',
+                  borderBottomRightRadius: 4,
+                } : {
+                  backgroundColor: 'rgba(255,255,255,0.07)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.1)',
+                  borderBottomLeftRadius: 4,
+                }}
+              >
+                {!isMe && (
+                  <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: '600', marginBottom: 4 }}>
+                    {item.authorAnonId.slice(0, 8)}
+                  </Text>
+                )}
+                <Text className="text-sm text-white/80 leading-5">{item.text}</Text>
+              </View>
+            </View>
+          );
+        }}
         ListEmptyComponent={
-          <Text className="text-center text-muted-dark mt-8 text-sm">No comments yet</Text>
+          <View className="items-center mt-16">
+            <Text style={{ fontSize: 32 }}>💬</Text>
+            <Text className="text-white/35 mt-3 text-sm">No comments yet — be the first</Text>
+          </View>
         }
+        contentContainerStyle={{ paddingVertical: 12 }}
       />
-      <View className="flex-row p-3 border-t border-surface-elevated">
+      <View
+        className="flex-row items-center p-3"
+        style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', backgroundColor: '#2a1215' }}
+      >
         <TextInput
-          className="flex-1 border border-muted-border rounded-[20px] px-4 py-2 text-sm text-white bg-surface-card"
+          className="flex-1 rounded-2xl px-4 py-2.5 text-sm text-white"
+          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
           value={text}
           onChangeText={setText}
           placeholder="Add a comment..."
-          placeholderTextColor="#666"
+          placeholderTextColor="rgba(255,255,255,0.3)"
           accessibilityLabel="Comment input"
         />
         <TouchableOpacity
-          className="ml-2 justify-center px-4"
+          className="ml-2 px-4 py-2.5 rounded-xl"
+          style={{ backgroundColor: text.trim() ? '#DC2626' : 'rgba(255,255,255,0.07)' }}
           onPress={handleSend}
-          disabled={sending}
+          disabled={sending || !text.trim()}
           accessibilityLabel="Send comment"
           accessibilityRole="button"
         >
-          <Text className="text-spotify font-bold text-sm">Send</Text>
+          <Text style={{ fontWeight: '700', fontSize: 13, color: text.trim() ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+            Send
+          </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

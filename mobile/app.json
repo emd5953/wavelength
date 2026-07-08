@@ -14,8 +14,8 @@
         }
       ]
     ],
-    "web": {
-      "bundler": "metro"
+    "ios": {
+      "bundleIdentifier": "com.anonymous.wavelength"
     }
   }
 }

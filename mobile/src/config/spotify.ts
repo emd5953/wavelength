@@ -1,8 +1,7 @@
-                Q                     Qimport * as AuthSession from 'expo-auth-session';
+import * as AuthSession from 'expo-auth-session';
 
 const redirectUri = AuthSession.makeRedirectUri({
   native: 'wavelength://callback',
-  path: 'callback',
 });
 console.log('REDIRECT URI:', redirectUri);
 

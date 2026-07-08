@@ -23,7 +23,7 @@ export default function FeedMap({ broadcasts, userLocation }: FeedMapProps) {
       };
 
   return (
-    <MapView className="flex-1" initialRegion={region}>
+    <MapView style={{ flex: 1 }} initialRegion={region}>
       {broadcasts.map((b) => {
         if (!b.location) return null;
         return (
@@ -36,15 +36,15 @@ export default function FeedMap({ broadcasts, userLocation }: FeedMapProps) {
             pinColor="#1DB954"
           >
             <Callout>
-              <View className="flex-row items-center p-1 max-w-[200px]">
+              <View style={{ flexDirection: 'row', alignItems: 'center', padding: 4, maxWidth: 200 }}>
                 {b.albumArtUrl ? (
-                  <Image source={{ uri: b.albumArtUrl }} className="w-10 h-10 rounded" />
+                  <Image source={{ uri: b.albumArtUrl }} style={{ width: 40, height: 40, borderRadius: 4 }} />
                 ) : null}
-                <View className="ml-2 flex-1">
-                  <Text className="text-[13px] font-bold text-gray-900" numberOfLines={1}>
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#111' }} numberOfLines={1}>
                     {b.trackTitle}
                   </Text>
-                  <Text className="text-xs text-muted-dark" numberOfLines={1}>
+                  <Text style={{ fontSize: 12, color: '#666' }} numberOfLines={1}>
                     {b.artistName}
                   </Text>
                 </View>

@@ -56,9 +56,7 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
     try {
       await acceptConnectionRequest(requestId);
       setIncoming((prev) => prev.filter((r) => r.id !== requestId));
-    } catch {
-      // silently fail
-    } finally {
+    } catch {} finally {
       setActionLoading(null);
     }
   };
@@ -68,9 +66,7 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
     try {
       await declineConnectionRequest(requestId);
       setIncoming((prev) => prev.filter((r) => r.id !== requestId));
-    } catch {
-      // silently fail
-    } finally {
+    } catch {} finally {
       setActionLoading(null);
     }
   };
@@ -80,22 +76,29 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
     try {
       await cancelConnectionRequest(requestId);
       setOutgoing((prev) => prev.filter((r) => r.id !== requestId));
-    } catch {
-      // silently fail
-    } finally {
+    } catch {} finally {
       setActionLoading(null);
     }
   };
 
   const renderIncomingItem = ({ item }: { item: ConnectionRequestData }) => (
-    <View className="flex-row items-center justify-between p-3.5 my-1 bg-surface-card rounded-[10px]">
-      <View className="flex-1">
-        <Text className="text-[15px] text-neutral-300">Anonymous listener</Text>
-        <Text className="text-xs text-muted-dark mt-1">{formatTimeLeft(item.expiresAt)}</Text>
+    <View
+      className="mx-4 my-1.5 p-4 rounded-2xl"
+      style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1">
+          <Text className="text-base text-white/80 font-medium">Anonymous listener</Text>
+          <View className="flex-row items-center mt-1 gap-1">
+            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#DC2626' }} />
+            <Text className="text-xs text-white/35">{formatTimeLeft(item.expiresAt)}</Text>
+          </View>
+        </View>
       </View>
-      <View className="flex-row gap-2">
+      <View className="flex-row gap-2 mt-3">
         <TouchableOpacity
-          className="bg-spotify px-4 py-2 rounded-lg min-w-[70px] items-center"
+          className="flex-1 py-3 rounded-xl items-center"
+          style={{ backgroundColor: '#DC2626' }}
           onPress={() => handleAccept(item.id)}
           disabled={actionLoading === item.id}
           accessibilityLabel="Accept connection request"
@@ -104,40 +107,48 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
           {actionLoading === item.id ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text className="text-white font-bold text-[13px]">Accept</Text>
+            <Text className="text-white font-bold text-sm">Accept</Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity
-          className="bg-surface-elevated px-4 py-2 rounded-lg"
+          className="flex-1 py-3 rounded-xl items-center"
+          style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
           onPress={() => handleDecline(item.id)}
           disabled={actionLoading === item.id}
           accessibilityLabel="Decline connection request"
           accessibilityRole="button"
         >
-          <Text className="text-muted-light text-[13px]">Decline</Text>
+          <Text className="text-white/60 text-sm font-medium">Decline</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
   const renderOutgoingItem = ({ item }: { item: ConnectionRequestData }) => (
-    <View className="flex-row items-center justify-between p-3.5 my-1 bg-surface-card rounded-[10px]">
-      <View className="flex-1">
-        <Text className="text-[15px] text-neutral-300">Pending request</Text>
-        <Text className="text-xs text-muted-dark mt-1">{formatTimeLeft(item.expiresAt)}</Text>
-      </View>
-      <View className="flex-row gap-2">
+    <View
+      className="mx-4 my-1.5 p-4 rounded-2xl"
+      style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1">
+          <Text className="text-base text-white/80 font-medium">Pending request</Text>
+          <View className="flex-row items-center mt-1 gap-1">
+            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#DC2626' }} />
+            <Text className="text-xs text-white/35">{formatTimeLeft(item.expiresAt)}</Text>
+          </View>
+        </View>
         <TouchableOpacity
-          className="border border-danger px-4 py-2 rounded-lg"
+          className="px-4 py-2.5 rounded-xl"
+          style={{ borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)' }}
           onPress={() => handleCancel(item.id)}
           disabled={actionLoading === item.id}
           accessibilityLabel="Cancel connection request"
           accessibilityRole="button"
         >
           {actionLoading === item.id ? (
-            <ActivityIndicator size="small" color="#d32f2f" />
+            <ActivityIndicator size="small" color="#ef4444" />
           ) : (
-            <Text className="text-danger text-[13px]">Cancel</Text>
+            <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600' }}>Cancel</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -146,32 +157,38 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
 
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-surface">
-        <ActivityIndicator size="large" color="#1DB954" />
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: '#1a0a0a' }}>
+        <ActivityIndicator size="large" color="#DC2626" />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-surface">
-      <View className="flex-row border-b border-surface-elevated">
+    <View className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
+      {/* Tab bar — frosted glass */}
+      <View
+        className="flex-row mx-4 mt-3 rounded-2xl p-1"
+        style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+      >
         <TouchableOpacity
-          className={`flex-1 py-3.5 items-center ${tab === 'incoming' ? 'border-b-2 border-spotify' : ''}`}
+          className="flex-1 py-2.5 rounded-xl items-center"
+          style={tab === 'incoming' ? { backgroundColor: '#DC2626' } : undefined}
           onPress={() => setTab('incoming')}
           accessibilityRole="tab"
           accessibilityState={{ selected: tab === 'incoming' }}
         >
-          <Text className={`text-sm ${tab === 'incoming' ? 'text-spotify font-bold' : 'text-muted-dark'}`}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: tab === 'incoming' ? '#fff' : 'rgba(255,255,255,0.4)' }}>
             Incoming{incoming.length > 0 ? ` (${incoming.length})` : ''}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          className={`flex-1 py-3.5 items-center ${tab === 'outgoing' ? 'border-b-2 border-spotify' : ''}`}
+          className="flex-1 py-2.5 rounded-xl items-center"
+          style={tab === 'outgoing' ? { backgroundColor: '#DC2626' } : undefined}
           onPress={() => setTab('outgoing')}
           accessibilityRole="tab"
           accessibilityState={{ selected: tab === 'outgoing' }}
         >
-          <Text className={`text-sm ${tab === 'outgoing' ? 'text-spotify font-bold' : 'text-muted-dark'}`}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: tab === 'outgoing' ? '#fff' : 'rgba(255,255,255,0.4)' }}>
             Outgoing{outgoing.length > 0 ? ` (${outgoing.length})` : ''}
           </Text>
         </TouchableOpacity>
@@ -183,9 +200,12 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
           keyExtractor={(item) => item.id}
           renderItem={renderIncomingItem}
           ListEmptyComponent={
-            <Text className="text-center text-muted-dark mt-8 text-sm">No incoming requests</Text>
+            <View className="items-center mt-16">
+              <Text style={{ fontSize: 32 }}>📥</Text>
+              <Text className="text-white/35 mt-3 text-sm">No incoming requests</Text>
+            </View>
           }
-          contentContainerStyle={{ padding: 12 }}
+          contentContainerStyle={{ paddingVertical: 8 }}
         />
       ) : (
         <FlatList
@@ -193,9 +213,12 @@ export default function ConnectionRequestScreen({ userId }: ConnectionRequestScr
           keyExtractor={(item) => item.id}
           renderItem={renderOutgoingItem}
           ListEmptyComponent={
-            <Text className="text-center text-muted-dark mt-8 text-sm">No outgoing requests</Text>
+            <View className="items-center mt-16">
+              <Text style={{ fontSize: 32 }}>📤</Text>
+              <Text className="text-white/35 mt-3 text-sm">No outgoing requests</Text>
+            </View>
           }
-          contentContainerStyle={{ padding: 12 }}
+          contentContainerStyle={{ paddingVertical: 8 }}
         />
       )}
     </View>

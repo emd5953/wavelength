@@ -1,10 +1,6 @@
 import { Text, View, TouchableOpacity, Linking, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-/**
- * Screen shown when GPS permission is denied.
- * Explains why location is needed and links to device settings.
- * Requirement 2.5
- */
 export default function LocationRequiredScreen() {
   const openSettings = () => {
     if (Platform.OS === 'ios') {
@@ -15,21 +11,35 @@ export default function LocationRequiredScreen() {
   };
 
   return (
-    <View className="flex-1 justify-center items-center p-8 bg-surface">
-      <Text className="text-[22px] font-bold mb-4 text-center text-white">
+    <LinearGradient colors={['#DC2626', '#B91C1C', '#1a0a0a']} locations={[0, 0.4, 1]} className="flex-1 justify-center items-center px-8">
+      <View
+        className="w-20 h-20 rounded-2xl items-center justify-center mb-6"
+        style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+      >
+        <Text style={{ fontSize: 38 }}>📍</Text>
+      </View>
+
+      <Text className="text-2xl font-extrabold text-white text-center mb-3">
         Location Access Required
       </Text>
-      <Text className="text-base text-center text-muted-light mb-6 leading-6">
-        Wavelength needs your location to discover what people
-        near you are listening to. Without location access, the nearby feed and
-        broadcasting features cannot work.
+      <Text className="text-base text-white/60 text-center leading-6 mb-8">
+        Wavelength needs your location to discover what people near you are listening to. Your exact location is never shared with other users.
       </Text>
+
       <TouchableOpacity
-        className="bg-spotify px-6 py-3 rounded-lg"
+        className="w-full py-4 rounded-2xl items-center"
+        style={{
+          backgroundColor: '#fff',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.3,
+          shadowRadius: 16,
+        }}
         onPress={openSettings}
+        accessibilityRole="button"
       >
-        <Text className="text-white text-base font-bold">Open Settings</Text>
+        <Text style={{ color: '#DC2626', fontSize: 16, fontWeight: '800' }}>Open Settings</Text>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 }
