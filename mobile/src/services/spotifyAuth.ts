@@ -33,7 +33,7 @@ export const SpotifyAuthModule = {
     const result = await request.promptAsync(SPOTIFY_CONFIG.discovery);
 
     if (result.type !== 'success' || !result.params.code) {
-      console.log('AUTH RESULT:', result.type, result.params);
+      console.log('AUTH RESULT:', result.type);
       return null;
     }
 

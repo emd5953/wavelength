@@ -5,6 +5,11 @@
 
 import pool from '../db/connection';
 import type { SpotifyProfile } from '../types';
+import type {
+  SpotifyTopArtistsResponse,
+  SpotifyTopTracksResponse,
+  SpotifyUserResponse,
+} from '../types/spotify';
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 
@@ -44,20 +49,20 @@ export async function fetchSpotifyProfile(userId: string): Promise<SpotifyProfil
       return fallbackProfile(spotifyUserId);
     }
 
-    const me = await meRes.json();
+    const me = (await meRes.json()) as SpotifyUserResponse;
     const displayName = me.display_name || spotifyUserId;
     const profileImageUrl = me.images?.[0]?.url || '';
     const profileLink = me.external_urls?.spotify || '';
 
     let topArtists: string[] = [];
     if (artistsRes.ok) {
-      const artistsData = await artistsRes.json();
+      const artistsData = (await artistsRes.json()) as SpotifyTopArtistsResponse;
       topArtists = (artistsData.items || []).slice(0, 10).map((a: any) => a.name);
     }
 
     let topTracks: string[] = [];
     if (tracksRes.ok) {
-      const tracksData = await tracksRes.json();
+      const tracksData = (await tracksRes.json()) as SpotifyTopTracksResponse;
       topTracks = (tracksData.items || []).slice(0, 10).map((t: any) => t.name);
     }
 

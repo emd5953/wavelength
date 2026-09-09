@@ -6,6 +6,7 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db/connection';
 import { syncUserTaste } from '../services/tasteService';
+import type { SpotifyTokenResponse, SpotifyUserResponse } from '../types/spotify';
 
 const router = Router();
 
@@ -46,7 +47,7 @@ router.post('/callback', async (req: Request, res: Response) => {
       return;
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = (await tokenResponse.json()) as SpotifyTokenResponse;
     console.log('Token exchange success, got tokens');
     const { access_token, refresh_token, expires_in } = tokenData;
     const expiresAt = new Date(Date.now() + expires_in * 1000);
@@ -63,7 +64,7 @@ router.post('/callback', async (req: Request, res: Response) => {
       return;
     }
 
-    const meData = await meResponse.json();
+    const meData = (await meResponse.json()) as SpotifyUserResponse;
     const spotifyUserId = meData.id;
 
     // Upsert user
@@ -131,7 +132,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       return;
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = (await tokenResponse.json()) as SpotifyTokenResponse;
     const { access_token, expires_in } = tokenData;
     const expiresAt = new Date(Date.now() + expires_in * 1000);
 

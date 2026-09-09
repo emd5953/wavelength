@@ -1,4 +1,8 @@
 import pool from '../db/connection';
+import type {
+  SpotifyTopArtistsResponse,
+  SpotifyTopTracksResponse,
+} from '../types/spotify';
 
 /**
  * Sync a user's top artists and tracks from Spotify into the DB.
@@ -18,7 +22,7 @@ export async function syncUserTaste(
     ]);
 
     if (artistsRes.ok) {
-      const data = await artistsRes.json();
+      const data = (await artistsRes.json()) as SpotifyTopArtistsResponse;
       // Clear old data and insert fresh
       await pool.query('DELETE FROM user_top_artists WHERE user_id = $1', [userId]);
       for (let i = 0; i < data.items.length; i++) {
@@ -30,7 +34,7 @@ export async function syncUserTaste(
     }
 
     if (tracksRes.ok) {
-      const data = await tracksRes.json();
+      const data = (await tracksRes.json()) as SpotifyTopTracksResponse;
       await pool.query('DELETE FROM user_top_tracks WHERE user_id = $1', [userId]);
       for (let i = 0; i < data.items.length; i++) {
         const track = data.items[i];
