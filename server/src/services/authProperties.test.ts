@@ -33,7 +33,17 @@ vi.stubGlobal('fetch', mockFetch);
 beforeEach(() => {
   mockQuery.mockReset();
   mockFetch.mockReset();
+  installFetchFallback();
 });
+
+/**
+ * Routes fire background work (e.g. syncUserTaste) that issues its own Spotify
+ * calls beyond the ones each property queues. Give those a terminal `ok: false`
+ * so they no-op instead of dereferencing an undefined response.
+ */
+function installFetchFallback() {
+  mockFetch.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as any);
+}
 
 // ============================================================
 // Property 1: Auth code exchange round-trip
@@ -57,6 +67,8 @@ describe('Property 1: Auth code exchange round-trip', () => {
         tokenStringArb, tokenStringArb, spotifyUserIdArb, expiresInArb, userIdArb,
         async (accessToken, refreshToken, spotifyId, expiresIn, dbId) => {
           mockFetch.mockReset();
+        installFetchFallback();
+          installFetchFallback();
           mockQuery.mockReset();
 
           // Spotify token endpoint
@@ -119,6 +131,8 @@ describe('Property 2: Token refresh updates stored credentials', () => {
         tokenStringArb, tokenStringArb, expiresInArb,
         async (newAccessToken, oldRefreshToken, expiresIn) => {
           mockFetch.mockReset();
+        installFetchFallback();
+          installFetchFallback();
           mockQuery.mockReset();
 
           mockFetch.mockResolvedValueOnce({

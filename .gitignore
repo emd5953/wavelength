@@ -9,3 +9,6 @@ mobile/android
 # Environment files
 .env
 .vscode
+
+# Build output
+server/dist
