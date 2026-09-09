@@ -46,7 +46,7 @@ export async function syncUserTaste(
       }
     }
   } catch (err) {
-    console.error('Taste sync error:', err);
+    console.error(`Taste sync error for user ${userId}:`, err);
   }
 }
 
@@ -79,7 +79,7 @@ export async function getTasteScore(userA: string, userB: string): Promise<numbe
 
     return Math.min(artistScore + trackScore, 100);
   } catch (err) {
-    console.error('Taste score error:', err);
+    console.error(`Taste score error for ${userA} vs ${userB}:`, err);
     return 0;
   }
 }

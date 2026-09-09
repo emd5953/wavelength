@@ -60,6 +60,23 @@ cd mobile && npm start
 node scripts/check-local-setup.mjs
 ```
 
+## Testing
+
+```bash
+# Unit + route tests (no external dependencies — everything is mocked)
+cd server && npm test
+
+# PostGIS integration tests (needs a live database)
+docker compose up -d postgres
+cd server && DB_HOST=localhost DB_PASSWORD=postgres npm run test:integration
+
+# Mobile tests
+cd mobile && npm test && npm run check:types
+```
+
+CI runs all four suites plus `docker compose config` on every push to `main` and
+every pull request — see `.github/workflows/ci.yml`.
+
 ## Environment Variables
 
 | Variable | Description |
