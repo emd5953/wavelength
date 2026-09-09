@@ -5,7 +5,6 @@
 
 import pool from '../db/connection';
 import type { Connection, SpotifyProfile } from '../types';
-import {  } from './spotifyProfileFetcher';
 
 export interface ConnectionListItem {
   id: string;
@@ -22,6 +21,88 @@ export interface ConnectionDetail {
   createdAt: number;
 }
 
+export interface ConnectionRequest {
+  id: string;
+  viewerUserId: string;
+  broadcasterUserId: string;
+  status: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+/**
+ * Raised when the acting user is not the party entitled to perform the action.
+ * Routes map this to 403.
+ */
+export class NotEntitledError extends Error {
+  constructor(message = 'Not entitled to act on this request') {
+    super(message);
+    this.name = 'NotEntitledError';
+  }
+}
+
+/**
+ * Raised when a request exists but is not in the state the action requires.
+ * Routes map this to 409.
+ */
+export class RequestStateError extends Error {
+  constructor(message = 'Request is not pending') {
+    super(message);
+    this.name = 'RequestStateError';
+  }
+}
+
+/**
+ * Raised when no request exists for the given id. Routes map this to 404.
+ */
+export class RequestNotFoundError extends Error {
+  constructor(message = 'Request not found') {
+    super(message);
+    this.name = 'RequestNotFoundError';
+  }
+}
+
+/**
+ * Resolve a live broadcast's anonymous id to the user broadcasting it.
+ *
+ * Anonymous ids rotate per broadcast (broadcastService assigns a fresh one on
+ * every insert), so this only resolves while the broadcast is active. A viewer
+ * can therefore only address someone whose broadcast they can currently see.
+ * Returns null once the broadcast has ended.
+ */
+export async function resolveAnonId(anonymousId: string): Promise<string | null> {
+  const result = await pool.query(
+    'SELECT user_id AS "userId" FROM broadcasts WHERE anonymous_id = $1',
+    [anonymousId],
+  );
+  return result.rowCount === 0 ? null : (result.rows[0].userId as string);
+}
+
+/**
+ * Load a request and assert the acting user may perform `verb` on it.
+ * Accept and decline belong to the broadcaster; cancel belongs to the viewer.
+ */
+async function authorizeRequest(
+  requestId: string,
+  actingUserId: string,
+  verb: 'accept' | 'decline' | 'cancel',
+): Promise<{ viewerUserId: string; broadcasterUserId: string }> {
+  const result = await pool.query(
+    `SELECT viewer_user_id AS "viewerUserId", broadcaster_user_id AS "broadcasterUserId", status
+     FROM connection_requests WHERE id = $1`,
+    [requestId],
+  );
+
+  if (result.rowCount === 0) throw new RequestNotFoundError();
+
+  const { viewerUserId, broadcasterUserId, status } = result.rows[0];
+  const entitled = verb === 'cancel' ? viewerUserId : broadcasterUserId;
+  if (entitled !== actingUserId) throw new NotEntitledError();
+  if (status !== 'pending') throw new RequestStateError(`Request is ${status}`);
+
+  return { viewerUserId, broadcasterUserId };
+}
+
 /**
  * Send a connection request from viewer to broadcaster.
  * Requirement 6.1: create pending request with 24h expiry.
@@ -30,6 +111,19 @@ export async function sendRequest(
   viewerUserId: string,
   broadcasterUserId: string,
 ): Promise<{ id: string; status: string; expiresAt: number }> {
+  if (viewerUserId === broadcasterUserId) {
+    throw new RequestStateError('Cannot send a connection request to yourself');
+  }
+
+  const existing = await pool.query(
+    `SELECT 1 FROM connection_requests
+     WHERE viewer_user_id = $1 AND broadcaster_user_id = $2 AND status = 'pending'`,
+    [viewerUserId, broadcasterUserId],
+  );
+  if ((existing.rowCount ?? 0) > 0) {
+    throw new RequestStateError('A pending request to this listener already exists');
+  }
+
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const result = await pool.query(
     `INSERT INTO connection_requests (viewer_user_id, broadcaster_user_id, status, expires_at)
@@ -45,16 +139,13 @@ export async function sendRequest(
  * Accept a connection request — reveal profiles, create Connection record.
  * Requirement 6.2
  */
-export async function acceptRequest(requestId: string): Promise<Connection> {
-  const reqResult = await pool.query(
-    `UPDATE connection_requests SET status = 'accepted'
-     WHERE id = $1 AND status = 'pending'
-     RETURNING viewer_user_id AS "viewerUserId", broadcaster_user_id AS "broadcasterUserId"`,
+export async function acceptRequest(requestId: string, actingUserId: string): Promise<Connection> {
+  const { viewerUserId, broadcasterUserId } = await authorizeRequest(requestId, actingUserId, 'accept');
+
+  await pool.query(
+    `UPDATE connection_requests SET status = 'accepted' WHERE id = $1 AND status = 'pending'`,
     [requestId],
   );
-  if (reqResult.rowCount === 0) throw new Error('Request not found or not pending');
-
-  const { viewerUserId, broadcasterUserId } = reqResult.rows[0];
 
   const connResult = await pool.query(
     `INSERT INTO connections (user_a_id, user_b_id)
@@ -83,7 +174,8 @@ export async function acceptRequest(requestId: string): Promise<Connection> {
  * Decline a connection request.
  * Requirement 6.3
  */
-export async function declineRequest(requestId: string): Promise<void> {
+export async function declineRequest(requestId: string, actingUserId: string): Promise<void> {
+  await authorizeRequest(requestId, actingUserId, 'decline');
   await pool.query(
     `UPDATE connection_requests SET status = 'declined' WHERE id = $1 AND status = 'pending'`,
     [requestId],
@@ -94,7 +186,8 @@ export async function declineRequest(requestId: string): Promise<void> {
  * Cancel a pending connection request.
  * Requirement 6.4
  */
-export async function cancelRequest(requestId: string): Promise<void> {
+export async function cancelRequest(requestId: string, actingUserId: string): Promise<void> {
+  await authorizeRequest(requestId, actingUserId, 'cancel');
   await pool.query(
     `UPDATE connection_requests SET status = 'cancelled' WHERE id = $1 AND status = 'pending'`,
     [requestId],
@@ -232,4 +325,45 @@ async function fetchSpotifyProfile(userId: string): Promise<SpotifyProfile> {
     topArtists: [],
     topTracks: [],
   };
+}
+
+/**
+ * Requests addressed to a user — the ones they can accept or decline.
+ * Requirement 6.1
+ */
+export async function getIncomingRequests(userId: string): Promise<ConnectionRequest[]> {
+  return queryRequests('broadcaster_user_id', userId);
+}
+
+/**
+ * Requests a user has sent — the ones they can cancel.
+ * Requirement 6.4
+ */
+export async function getOutgoingRequests(userId: string): Promise<ConnectionRequest[]> {
+  return queryRequests('viewer_user_id', userId);
+}
+
+/** Shared body of the two listings; `column` is a literal, never user input. */
+async function queryRequests(
+  column: 'broadcaster_user_id' | 'viewer_user_id',
+  userId: string,
+): Promise<ConnectionRequest[]> {
+  const result = await pool.query(
+    `SELECT id, viewer_user_id AS "viewerUserId", broadcaster_user_id AS "broadcasterUserId",
+            status, EXTRACT(EPOCH FROM created_at) * 1000 AS "createdAt",
+            EXTRACT(EPOCH FROM expires_at) * 1000 AS "expiresAt"
+     FROM connection_requests
+     WHERE ${column} = $1
+     ORDER BY created_at DESC`,
+    [userId],
+  );
+
+  return result.rows.map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    viewerUserId: row.viewerUserId as string,
+    broadcasterUserId: row.broadcasterUserId as string,
+    status: row.status as string,
+    createdAt: Number(row.createdAt),
+    expiresAt: Number(row.expiresAt),
+  }));
 }
