@@ -55,6 +55,9 @@ cd server && npm run dev
 
 # Start the mobile app
 cd mobile && npm start
+
+# Validate Docker config, server build/tests, and mobile tests
+node scripts/check-local-setup.mjs
 ```
 
 ## Environment Variables

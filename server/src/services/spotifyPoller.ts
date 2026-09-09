@@ -6,6 +6,10 @@
 
 import pool from '../db/connection';
 import { createBroadcast, removeBroadcast } from './broadcastService';
+import type {
+  SpotifyCurrentlyPlayingResponse,
+  SpotifyTokenResponse,
+} from '../types/spotify';
 
 const SPOTIFY_CURRENTLY_PLAYING = 'https://api.spotify.com/v1/me/player/currently-playing';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -32,7 +36,7 @@ async function refreshTokenIfNeeded(user: any): Promise<string | null> {
 
     if (!res.ok) return null;
 
-    const data = await res.json();
+    const data = (await res.json()) as SpotifyTokenResponse;
     const expiresAt = new Date(Date.now() + data.expires_in * 1000);
 
     await pool.query(
@@ -62,7 +66,7 @@ async function pollUser(user: any): Promise<void> {
       return;
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as SpotifyCurrentlyPlayingResponse;
 
     if (!data.is_playing || !data.item) {
       await removeBroadcast(user.id);
@@ -70,6 +74,7 @@ async function pollUser(user: any): Promise<void> {
     }
 
     const track = {
+      trackId: data.item.id,
       title: data.item.name,
       artist: data.item.artists.map((a: any) => a.name).join(', '),
       albumArt: data.item.album?.images?.[0]?.url || '',
