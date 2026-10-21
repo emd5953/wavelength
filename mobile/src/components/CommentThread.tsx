@@ -53,11 +53,7 @@ export default function CommentThread({ broadcastId, viewerAnonId, header }: Com
         )}
         ListHeaderComponent={header}
         ListEmptyComponent={
-          header ? (
-            <Text className="font-mono text-[13px] text-ink-dim px-6 py-2">
-              no comments yet. say what this song makes you think of.
-            </Text>
-          ) : (
+          header ? null : (
             <EmptyState title="no comments yet." body="say what this song makes you think of." />
           )
         }
@@ -68,7 +64,7 @@ export default function CommentThread({ broadcastId, viewerAnonId, header }: Com
         onChangeText={setText}
         onSend={handleSend}
         sending={sending}
-        placeholder="add a comment…"
+        placeholder="…"
         inputLabel="Comment input"
         sendLabel="Send comment"
       />

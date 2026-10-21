@@ -1,20 +1,31 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { getMyAnonId } from '../src/services/presence';
 import { getRememberedPlay } from '../src/services/nearbyFeed';
 import CommentThread from '../src/components/CommentThread';
 import Reactions from '../src/components/Reactions';
-import { formatTimeSince } from '../src/components/BroadcastRow';
-import { SectionLabel, OutlineButton } from '../src/components/ui';
+import { Back, Note } from '../src/components/icons';
+import { PressableScale, SPRING } from '../src/components/motion';
+import { COLORS } from '../src/components/ui';
 
-
-/** One play: big art, reactions, message the listener, and the comment thread. */
+/** One play: the cover, who's playing it, reactions, and the thread. */
 export default function PlayScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { broadcastId } = useLocalSearchParams<{ broadcastId: string }>();
   const play = broadcastId ? getRememberedPlay(broadcastId) : undefined;
   const [viewerAnonId, setViewerAnonId] = useState('');
+
+  // The cover settles in from slightly small, standing in for a shared-element transition
+  const scale = useSharedValue(0.94);
+  const coverStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  useEffect(() => {
+    scale.value = withSpring(1, SPRING.settle);
+  }, [scale]);
 
   useEffect(() => {
     getMyAnonId().then((id) => {
@@ -22,45 +33,59 @@ export default function PlayScreen() {
     });
   }, []);
 
-  if (!broadcastId || !viewerAnonId) return null;
+  if (!broadcastId || !viewerAnonId) return <View className="flex-1 bg-ground" />;
 
   // Opened without going through the feed (e.g. a deep link): comments only
   if (!play) return <CommentThread broadcastId={broadcastId} viewerAnonId={viewerAnonId} />;
 
-  const live = play.isLive;
-  const when = live
-    ? 'playing now'
-    : `played ${formatTimeSince(Date.now() - (play.endedAt ?? play.startedAt))} ago`;
-  const match = play.tasteScore ? ` · ${play.tasteScore}% match` : '';
-
   const details = (
-    <View className="px-6 pt-2 pb-4">
-      {play.albumArtUrl ? (
-        <Image source={{ uri: play.albumArtUrl }} className="w-full aspect-square rounded-[14px] bg-card" />
-      ) : null}
-      <Text className="font-mono-light text-[26px] text-ink mt-6" numberOfLines={2}>{play.trackTitle}</Text>
-      <Text className="font-mono text-[15px] text-ink-muted mt-1" numberOfLines={1}>{play.artistName}</Text>
-      <View className="flex-row items-center mt-2">
-        {live && <View className="w-1.5 h-1.5 rounded-full bg-live mr-1.5" />}
-        <Text className="font-mono text-[13px] text-ink-dim">{when}{match}</Text>
-      </View>
+    <View>
+      <Animated.View style={[{ width, height: width }, coverStyle]}>
+        {play.albumArtUrl ? <Image source={{ uri: play.albumArtUrl }} style={{ width: '100%', height: '100%' }} /> : null}
+      </Animated.View>
 
-      <View className="mt-6">
-        <Reactions broadcastId={play.id} />
-      </View>
+      <Animated.View entering={FadeIn.delay(120)} className="px-6 pt-6">
+        <View className="flex-row items-start">
+          <View className="flex-1 pr-4">
+            <Text className="font-mono-light text-[26px] text-ink" numberOfLines={2}>{play.trackTitle}</Text>
+            <View className="flex-row items-center mt-1.5">
+              {play.isLive && <View className="w-1.5 h-1.5 rounded-full bg-live mr-2" />}
+              <Text className="font-mono text-[15px] text-ink-muted" numberOfLines={1}>{play.artistName}</Text>
+            </View>
+          </View>
+          {play.anonymousId ? (
+            <PressableScale
+              scaleTo={0.88}
+              onPress={() => router.push(`/dm?recipientAnonId=${play.anonymousId}`)}
+              accessibilityLabel="Message the listener"
+              style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: COLORS.rule, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Note size={24} color={COLORS.ink} />
+            </PressableScale>
+          ) : null}
+        </View>
 
-      {play.anonymousId ? (
-        <OutlineButton
-          label="message the listener"
-          onPress={() => router.push(`/dm?recipientAnonId=${play.anonymousId}`)}
-          accessibilityLabel="Send direct message"
-          className="mt-6"
-        />
-      ) : null}
-
-      <SectionLabel title="COMMENTS" className="mt-10" />
+        <View className="mt-8 mb-6">
+          <Reactions broadcastId={play.id} />
+        </View>
+        <View className="h-px bg-rule mb-2" />
+      </Animated.View>
     </View>
   );
 
-  return <CommentThread broadcastId={play.id} viewerAnonId={viewerAnonId} header={details} />;
+  return (
+    <View className="flex-1 bg-ground">
+      <CommentThread broadcastId={play.id} viewerAnonId={viewerAnonId} header={details} />
+      <View style={{ position: 'absolute', top: insets.top + 6, left: 14 }}>
+        <PressableScale
+          scaleTo={0.88}
+          onPress={() => router.back()}
+          accessibilityLabel="Back"
+          style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(5,31,51,0.55)', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Back size={22} color={COLORS.ink} />
+        </PressableScale>
+      </View>
+    </View>
+  );
 }

@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FeedHeader from '../../src/components/FeedHeader';
+import MarkHeader from '../../src/components/MarkHeader';
 import FeedMap from '../../src/components/FeedMap';
 import { useRouter } from 'expo-router';
 import { useNearbyFeed, rememberPlay } from '../../src/services/nearbyFeed';
@@ -13,13 +13,7 @@ export default function MapScreen() {
 
   return (
     <View className="flex-1 bg-ground">
-      <FeedHeader
-        topInset={insets.top}
-        title="map"
-        artUrl={live[0]?.albumArtUrl || null}
-        liveCount={live.length}
-        earlierCount={broadcasts.length - live.length}
-      />
+      <MarkHeader topInset={insets.top} liveCount={live.length} />
       <FeedMap
         broadcasts={broadcasts}
         userLocation={userLocation}

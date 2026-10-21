@@ -17,6 +17,8 @@
     ],
     "ios": {
       "bundleIdentifier": "com.anonymous.wavelength"
-    }
+    },
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark"
   }
 }

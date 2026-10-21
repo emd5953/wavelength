@@ -24,16 +24,6 @@ export function Screen({ className = '', ...props }: ViewProps & { className?: s
   return <View className={`flex-1 bg-ground ${className}`} {...props} />;
 }
 
-/** Large light page title for tab screens, matching the feed header. */
-export function PageTitle({ title, subtitle, topInset }: { title: string; subtitle?: string; topInset: number }) {
-  return (
-    <View style={{ paddingTop: topInset + 12 }} className="px-6 pb-4">
-      <Text className="font-mono-light text-[32px] text-ink">{title}</Text>
-      {subtitle ? <Text className="font-mono text-[13px] text-ink-dim mt-1">{subtitle}</Text> : null}
-    </View>
-  );
-}
-
 /**
  * Profile picture, or the first letter of the name in a hairline circle when
  * there's no real image (the server's placeholder URLs count as none).

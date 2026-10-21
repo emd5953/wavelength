@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, Linking, Alert } from 'react-native';
 import { getConnectionDetail, removeConnection } from '../services/api';
 import type { ConnectionDetailData } from '../services/api';
-import { Screen, SectionLabel, EmptyState, PrimaryButton, OutlineButton, TextButton, Spinner, Avatar } from './ui';
+import { Screen, SectionLabel, EmptyState, TextButton, Spinner, Avatar, COLORS } from './ui';
+import { Note, Link, More } from './icons';
+import { PressableScale } from './motion';
 
 interface ConnectionDetailScreenProps {
   connectionId: string;
@@ -102,30 +104,38 @@ export default function ConnectionDetailScreen({
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}>
         <View className="items-center pt-8">
           <Avatar uri={profile.profileImageUrl} name={profile.displayName} size={96} />
-          <Text className="font-mono text-[13px] text-ink-dim mt-6">you're connected with</Text>
-          <Text className="font-mono-light text-[30px] text-ink mt-1 text-center">
+          <Text className="font-mono-light text-[30px] text-ink mt-6 text-center">
             {profile.displayName.toLowerCase()}
           </Text>
         </View>
 
-        <PrimaryButton label="message" onPress={onMessage} accessibilityLabel="Message" className="mt-8" />
-        <OutlineButton
-          label="open on spotify"
-          onPress={handleOpenSpotify}
-          accessibilityLabel="Open Spotify profile"
-          className="mt-3"
-        />
+        <View className="flex-row justify-center gap-6 mt-10">
+          <PressableScale
+            scaleTo={0.9}
+            onPress={onMessage}
+            accessibilityLabel="Message"
+            style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Note size={30} color={COLORS.ink} />
+          </PressableScale>
+          <PressableScale
+            scaleTo={0.9}
+            onPress={handleOpenSpotify}
+            accessibilityLabel="Open Spotify profile"
+            style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: COLORS.rule, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Link size={28} color={COLORS.ink} />
+          </PressableScale>
+        </View>
 
         {list('TOP ARTISTS', profile.topArtists)}
         {list('TOP TRACKS', profile.topTracks)}
 
-        <TextButton
-          label={removing ? 'removing…' : 'remove connection'}
-          onPress={handleRemove}
-          disabled={removing}
-          accessibilityLabel="Remove connection"
-          className="items-center mt-12 py-3"
-        />
+        <View className="items-center mt-14">
+          <PressableScale scaleTo={0.88} onPress={handleRemove} accessibilityLabel="Remove connection">
+            <More size={26} color={removing ? COLORS.rule : COLORS.inkDim} />
+          </PressableScale>
+        </View>
       </ScrollView>
     </Screen>
   );

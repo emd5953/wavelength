@@ -2,6 +2,7 @@ import "../global.css";
 import { Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
+import { LogBox } from 'react-native';
 import { cssInterop } from 'nativewind';
 import { COLORS } from '../src/components/ui';
 
@@ -9,6 +10,9 @@ import { COLORS } from '../src/components/ui';
 // Without this, className on LinearGradient is dropped and every gradient
 // screen collapses to its content height.
 cssInterop(LinearGradient, { className: 'style' });
+
+// Simulators can't get push tokens; this dev-only warning would sit over the tab bar.
+LogBox.ignoreLogs(['expo-notifications: obtaining a push token']);
 
 // Paper Mono (SIL OFL 1.1, assets/fonts/paper-mono/OFL.txt). Each weight is
 // its own family because React Native can't synthesize weights for custom
@@ -42,11 +46,11 @@ export default function RootLayout() {
       <Stack.Screen name="onboarding" options={{ title: 'Welcome', headerShown: false }} />
       <Stack.Screen name="index" options={{ title: 'Wavelength', headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="play" options={{ title: '' }} />
-      <Stack.Screen name="dm" options={{ title: 'message' }} />
-      <Stack.Screen name="connection-detail" options={{ title: 'profile' }} />
+      <Stack.Screen name="play" options={{ headerShown: false }} />
+      <Stack.Screen name="dm" options={{ title: '' }} />
+      <Stack.Screen name="connection-detail" options={{ title: '' }} />
       <Stack.Screen name="chat" options={{ title: '' }} />
-      <Stack.Screen name="connection-requests" options={{ title: 'requests' }} />
+      <Stack.Screen name="connection-requests" options={{ title: '' }} />
       <Stack.Screen name="location-required" options={{ title: 'location', headerShown: false }} />
     </Stack>
   );

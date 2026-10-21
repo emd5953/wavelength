@@ -1,40 +1,40 @@
-import { View, Text, SectionList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, FlatList, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import BroadcastRow from '../../src/components/BroadcastRow';
-import type { FeedBroadcast } from '../../src/services/api';
-import FeedHeader from '../../src/components/FeedHeader';
-import { SectionLabel, COLORS } from '../../src/components/ui';
+import CoverTile from '../../src/components/CoverTile';
+import MarkHeader from '../../src/components/MarkHeader';
+import EmptyArt from '../../src/components/EmptyArt';
+import { PressableScale } from '../../src/components/motion';
+import { COLORS } from '../../src/components/ui';
 import { useNearbyFeed, rememberPlay } from '../../src/services/nearbyFeed';
+import type { FeedBroadcast } from '../../src/services/api';
 
+const GUTTER = 12;
+const EDGE = 16;
+
+/** Nearby as a record crate: covers only. Live ones move; older ones fade. */
 export default function NearbyFeedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { broadcasts, loading, error, reload } = useNearbyFeed();
-
-  const live = broadcasts.filter((b) => b.isLive);
+  const tile = (width - EDGE * 2 - GUTTER) / 2;
+  const liveCount = broadcasts.filter((b) => b.isLive).length;
 
   const openPlay = (b: FeedBroadcast) => {
     rememberPlay(b);
     router.push(`/play?broadcastId=${b.id}`);
   };
-  const earlier = broadcasts.filter((b) => !b.isLive);
 
-  const header = (
-    <FeedHeader
-      topInset={insets.top}
-      title="nearby"
-      artUrl={live[0]?.albumArtUrl || null}
-      liveCount={live.length}
-      earlierCount={earlier.length}
-    />
-  );
+  const header = <MarkHeader topInset={insets.top} liveCount={liveCount} />;
 
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-ground">
-        <ActivityIndicator color={COLORS.inkDim} />
-        <Text className="font-mono text-[13px] text-ink-dim mt-4">listening around you…</Text>
+      <View className="flex-1 bg-ground">
+        {header}
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator color={COLORS.inkDim} />
+        </View>
       </View>
     );
   }
@@ -43,52 +43,26 @@ export default function NearbyFeedScreen() {
     return (
       <View className="flex-1 bg-ground">
         {header}
-        <View className="flex-1 justify-center items-center px-10">
-          <Text className="font-mono text-[15px] text-ink-muted text-center leading-6">
-            couldn't load what's playing nearby.
-          </Text>
-          <TouchableOpacity className="mt-5" onPress={reload} accessibilityRole="button" hitSlop={10}>
-            <Text className="font-mono-medium text-[13px] text-ink">try again</Text>
-          </TouchableOpacity>
-        </View>
+        <PressableScale onPress={reload} accessibilityLabel="Try again">
+          <EmptyArt caption="tap to retry" />
+        </PressableScale>
       </View>
     );
   }
-
-  if (broadcasts.length === 0) {
-    return (
-      <View className="flex-1 bg-ground">
-        {header}
-        <View className="flex-1 justify-center px-10">
-          <Text className="font-mono-light text-xl text-ink">nothing played nearby yet.</Text>
-          <Text className="font-mono text-[13px] text-ink-muted mt-3 leading-6">
-            songs played around you in the last 6 hours show up here. what's playing right now goes on top.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  const sections = [
-    { title: 'PLAYING NOW', data: live },
-    { title: 'EARLIER', data: earlier },
-  ].filter((section) => section.data.length > 0);
 
   return (
     <View className="flex-1 bg-ground">
       {header}
-      <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          renderSectionHeader={({ section }) => (
-            <SectionLabel title={section.title} className="px-6 pt-5 pb-2 bg-ground" />
-          )}
-          renderItem={({ item }) => <BroadcastRow broadcast={item} onOpen={openPlay} />}
-          ItemSeparatorComponent={() => <View className="h-px bg-rule ml-[88px] mr-6" />}
-          contentContainerStyle={{ paddingBottom: 16 }}
-          stickySectionHeadersEnabled={false}
-          showsVerticalScrollIndicator={false}
-        />
+      <FlatList
+        data={broadcasts}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={{ gap: GUTTER, paddingHorizontal: EDGE }}
+        contentContainerStyle={{ gap: GUTTER, paddingTop: 6, paddingBottom: 24 }}
+        renderItem={({ item, index }) => <CoverTile play={item} index={index} size={tile} onOpen={openPlay} />}
+        ListEmptyComponent={<EmptyArt caption="nothing nearby yet" />}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 }
