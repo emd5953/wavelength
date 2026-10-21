@@ -55,7 +55,8 @@ async function refreshTokenIfNeeded(user: any): Promise<string | null> {
   }
 }
 
-async function pollUser(user: any): Promise<void> {
+/** Exported for tests. */
+export async function pollUser(user: any): Promise<void> {
   if (!user.last_latitude || !user.last_longitude) return;
 
   const token = await refreshTokenIfNeeded(user);
@@ -70,10 +71,14 @@ async function pollUser(user: any): Promise<void> {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (res.status === 204 || !res.ok) {
+    if (res.status === 204) {
       await endPlayback(user.id);
       return;
     }
+
+    // A failed call (rate limit, 5xx, bad token) says nothing about playback.
+    // Leave the play alone; if failures persist, endStalePlays ends it.
+    if (!res.ok) return;
 
     const data = (await res.json()) as SpotifyCurrentlyPlayingResponse;
 

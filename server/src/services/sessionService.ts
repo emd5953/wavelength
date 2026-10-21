@@ -92,9 +92,15 @@ export async function resolveAnonId(anonymousId: string): Promise<string | null>
      WHERE s.anonymous_id = $1
        AND (
          s.ended_at IS NULL
-         OR EXISTS (SELECT 1 FROM broadcasts b WHERE b.session_id = s.id)
+         OR EXISTS (
+           -- Same window as the feed, so an id stops resolving the moment its
+           -- last play leaves the feed, not when the scheduler deletes it
+           SELECT 1 FROM broadcasts b
+           WHERE b.session_id = s.id
+             AND (b.ended_at IS NULL OR b.ended_at > NOW() - make_interval(hours => $2))
+         )
        )`,
-    [anonymousId],
+    [anonymousId, PLAY_RETENTION_HOURS],
   );
   return result.rowCount === 0 ? null : (result.rows[0].userId as string);
 }

@@ -236,8 +236,10 @@ otherwise skip, as today.
    emit `broadcast:ended`), insert play(T). `isNew`.
 4. **Playing T, latest play is T and ended < 5 min ago** (pause then resume)
    → reopen it (`ended_at = NULL`). No new entry, no push.
-5. **Not playing / 204 / Spotify error** → end the live play if there is one.
-   The session stays open.
+5. **Not playing / 204** → end the live play if there is one. The session
+   stays open.
+5a. **Spotify error (401, 429, 5xx)** → change nothing. An error says nothing
+   about playback. If errors persist, `endStalePlays` ends the play after 60s.
 6. **Same track on loop** → Spotify reports the same ID, so it stays one play
    (case 2).
 
@@ -356,6 +358,10 @@ What moved from the spec during implementation:
   ID, so it flips back to live without waiting for the 10s re-fetch.
   `endStalePlays` runs from the scheduler, which has no socket, so clients
   only see those ends on the next re-fetch.
+- Code review (Codex): Spotify API errors no longer end the play (case 5a).
+  `resolveAnonId` also applies the 6h window, so an ID stops resolving as soon
+  as its last play leaves the feed, not up to 30s later when the scheduler
+  deletes it.
 - `proximityService.findNearby` was deleted rather than updated. Nothing
   outside its integration test used it, and that test now runs against
   `getFeedInRadius`.

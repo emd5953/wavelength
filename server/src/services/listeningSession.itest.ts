@@ -314,6 +314,21 @@ describe('identity', () => {
     await expect(resolveAnonId(first.anonymousId)).resolves.toBe(u);
   });
 
+  it('an ended session stops resolving once its plays leave the 6h window, before deletion', async () => {
+    const u = await insertUser('resolve');
+    const { play } = await recordPlayback(u, track('r'), ORIGIN);
+    await recordNotPlaying(u);
+    await pool.query('UPDATE listening_sessions SET ended_at = NOW() WHERE user_id = $1', [u]);
+
+    await expect(resolveAnonId(play.anonymousId)).resolves.toBe(u);
+
+    await age(u, 6 * 60 + 1);
+    // The row still exists (expireOldPlays hasn't run), but it's out of the feed
+    const rows = await pool.query('SELECT 1 FROM broadcasts WHERE user_id = $1', [u]);
+    expect(rows.rows).toHaveLength(1);
+    await expect(resolveAnonId(play.anonymousId)).resolves.toBeNull();
+  });
+
   it('a DM thread is visible to both participants and to nobody else', async () => {
     const a = await insertUser('dma');
     const b = await insertUser('dmb');
