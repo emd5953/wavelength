@@ -45,6 +45,7 @@ export default function RootLayout() {
       <Stack.Screen name="play" options={{ title: '' }} />
       <Stack.Screen name="dm" options={{ title: 'message' }} />
       <Stack.Screen name="connection-detail" options={{ title: 'profile' }} />
+      <Stack.Screen name="chat" options={{ title: '' }} />
       <Stack.Screen name="connection-requests" options={{ title: 'requests' }} />
       <Stack.Screen name="location-required" options={{ title: 'location', headerShown: false }} />
     </Stack>

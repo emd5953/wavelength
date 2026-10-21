@@ -18,6 +18,8 @@ import {
   cancelRequest,
   getIncomingRequests,
   getOutgoingRequests,
+  getConnectionMessages,
+  sendConnectionMessage,
   NotEntitledError,
   RequestNotFoundError,
   RequestStateError,
@@ -147,6 +149,50 @@ router.get('/:id', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Get connection detail error:', err);
     res.status(500).json({ error: 'Failed to fetch connection detail' });
+  }
+});
+
+/** GET /connections/:id/messages — the connection's chat, participants only */
+router.get('/:id/messages', async (req: Request, res: Response) => {
+  try {
+    const messages = await getConnectionMessages(req.params.id, req.userId!);
+    if (!messages) {
+      res.status(404).json({ error: 'Connection not found' });
+      return;
+    }
+    res.json({ messages });
+  } catch (err) {
+    if ((err as { code?: string })?.code === '22P02') {
+      res.status(404).json({ error: 'Connection not found' });
+      return;
+    }
+    console.error('Get connection messages error:', err);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+/** POST /connections/:id/messages — send to the connection's chat */
+router.post('/:id/messages', async (req: Request, res: Response) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  if (!text) {
+    res.status(400).json({ error: 'text is required' });
+    return;
+  }
+
+  try {
+    const message = await sendConnectionMessage(req.params.id, req.userId!, text);
+    if (!message) {
+      res.status(404).json({ error: 'Connection not found' });
+      return;
+    }
+    res.json({ message });
+  } catch (err) {
+    if ((err as { code?: string })?.code === '22P02') {
+      res.status(404).json({ error: 'Connection not found' });
+      return;
+    }
+    console.error('Send connection message error:', err);
+    res.status(500).json({ error: 'Failed to send message' });
   }
 });
 

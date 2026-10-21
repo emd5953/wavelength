@@ -22,6 +22,7 @@ export default function ConnectionDetailRoute() {
       userId={userId}
       onBack={() => router.back()}
       onRemoved={() => router.replace('/connections')}
+      onMessage={() => router.push(`/chat?connectionId=${connectionId}`)}
     />
   );
 }

@@ -354,3 +354,60 @@ async function queryRequests(
     expiresAt: Number(row.expiresAt),
   }));
 }
+
+// --- Connection chat ---
+
+export interface ConnectionMessage {
+  id: string;
+  text: string;
+  /** Whether the requesting user sent it. The other side's user id is never returned. */
+  mine: boolean;
+  createdAt: number;
+}
+
+/** Whether the user is one of the two people in the connection. */
+async function isParticipant(connectionId: string, userId: string): Promise<boolean> {
+  const result = await pool.query(
+    'SELECT 1 FROM connections WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $2)',
+    [connectionId, userId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** The connection's chat, oldest first, or null if the user isn't in the connection. */
+export async function getConnectionMessages(
+  connectionId: string,
+  requestingUserId: string,
+): Promise<ConnectionMessage[] | null> {
+  if (!(await isParticipant(connectionId, requestingUserId))) return null;
+  const result = await pool.query(
+    `SELECT id, text, sender_user_id = $2 AS mine, EXTRACT(EPOCH FROM created_at) * 1000 AS "createdAt"
+     FROM connection_messages
+     WHERE connection_id = $1
+     ORDER BY created_at ASC`,
+    [connectionId, requestingUserId],
+  );
+  return result.rows.map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    text: r.text as string,
+    mine: r.mine as boolean,
+    createdAt: Number(r.createdAt),
+  }));
+}
+
+/** Send a chat message, or null if the user isn't in the connection. */
+export async function sendConnectionMessage(
+  connectionId: string,
+  senderUserId: string,
+  text: string,
+): Promise<ConnectionMessage | null> {
+  if (!(await isParticipant(connectionId, senderUserId))) return null;
+  const result = await pool.query(
+    `INSERT INTO connection_messages (connection_id, sender_user_id, text)
+     VALUES ($1, $2, $3)
+     RETURNING id, text, EXTRACT(EPOCH FROM created_at) * 1000 AS "createdAt"`,
+    [connectionId, senderUserId, text],
+  );
+  const r = result.rows[0];
+  return { id: r.id, text: r.text, mine: true, createdAt: Number(r.createdAt) };
+}

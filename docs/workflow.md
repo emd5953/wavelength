@@ -257,7 +257,9 @@ In a DM: toggle "ask to connect" → send
 /connections        GET /connections        → name, image, connected date
 /connection-detail  GET /connections/:id    → profile, top artists, top tracks
                                               (profile data is still a placeholder)
-remove              DELETE /connections/:id → anonymous again
+/chat               GET/POST /connections/:id/messages, polled every 5s while open
+                    ("message" on the connection profile)
+remove              DELETE /connections/:id → anonymous again, chat deleted
 ```
 
 ## 10. Profile & Settings (`app/profile.tsx`)

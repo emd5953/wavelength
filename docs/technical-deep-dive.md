@@ -126,6 +126,7 @@ every boot**, so every statement must be safe to re-run.
 | `reactions` / `comments` | Per play, keyed by the actor's anonymous ID; cascade with the play |
 | `direct_messages` | `sender_anon_id` → `recipient_anon_id` |
 | `connection_requests` / `connections` | By real user ID; 24h request expiry |
+| `connection_messages` | Chat between connected users, by real user ID; cascades with the connection |
 | `user_top_artists` / `user_top_tracks` | Medium-term top 20s, for taste match |
 | `user_repeat_tracks` | Short-term top 50 track IDs, for on-repeat push |
 | `push_notifications_sent` | `(recipient, listener, track)` dedup for push |
@@ -156,6 +157,7 @@ All routes except `/auth/*` and `/health` require a Bearer token.
 | `GET /connections/requests/incoming` · `/outgoing` | Pending requests |
 | `POST /connections/requests/:id/accept` · `/decline` · `/cancel` | 403 if the caller isn't entitled, 409 if not pending |
 | `GET /connections`, `GET /connections/:id`, `DELETE /connections/:id` | Connections and the revealed profile |
+| `GET /connections/:id/messages` · `POST` `{ text }` | Chat between the two connected users. Participants only (404 otherwise); each message has `mine`, never a user ID. Deleted with the connection |
 
 An anonymous ID is **addressable** while its session is open, or while it has
 a play still inside the 6h feed window.
@@ -242,6 +244,7 @@ mobile/
 │   ├── play.tsx                # One play: big art, reactions, message, comments
 │   ├── dm.tsx
 │   ├── connection-detail.tsx · connection-requests.tsx
+│   ├── chat.tsx                # Chat with a connection (polls every 5s)
 │   └── location-required.tsx
 ├── assets/fonts/paper-mono/    # Paper Mono, SIL OFL 1.1
 └── src/
@@ -267,7 +270,7 @@ mobile/
 
 ```
 server/src/
-├── db/                     # pool, migration runner, migrations 001–004
+├── db/                     # pool, migration runner, migrations 001–005
 ├── middleware/             # auth (Bearer → req.userId), errorHandler
 ├── routes/                 # auth, feed, social, connections, account
 ├── services/

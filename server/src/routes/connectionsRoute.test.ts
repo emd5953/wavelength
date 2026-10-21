@@ -29,6 +29,8 @@ const svc = {
   cancelRequest: vi.fn(),
   getIncomingRequests: vi.fn(),
   getOutgoingRequests: vi.fn(),
+  getConnectionMessages: vi.fn(),
+  sendConnectionMessage: vi.fn(),
 };
 
 // The error classes are real — the router narrows on `instanceof`, so mocking
@@ -49,6 +51,8 @@ vi.mock('../services/connectionService', async (importOriginal) => {
     cancelRequest: (...a: any[]) => svc.cancelRequest(...a),
     getIncomingRequests: (...a: any[]) => svc.getIncomingRequests(...a),
     getOutgoingRequests: (...a: any[]) => svc.getOutgoingRequests(...a),
+    getConnectionMessages: (...a: any[]) => svc.getConnectionMessages(...a),
+    sendConnectionMessage: (...a: any[]) => svc.sendConnectionMessage(...a),
   };
 });
 
@@ -401,5 +405,61 @@ describe('connections list and detail', () => {
 
     expect(res.status).toBe(500);
     logged.mockRestore();
+  });
+});
+
+// ============================================================
+// Connection chat
+// ============================================================
+
+describe('connection chat', () => {
+  it('returns the thread for a participant, scoped to the caller', async () => {
+    const app = await buildApp();
+    svc.getConnectionMessages.mockResolvedValue([{ id: 'm1', text: 'hi', mine: true, createdAt: 1 }]);
+
+    const res = await auth(request(app).get('/connections/c1/messages'));
+
+    expect(res.status).toBe(200);
+    expect(res.body.messages).toHaveLength(1);
+    expect(svc.getConnectionMessages).toHaveBeenCalledWith('c1', USER_ID);
+    expect(JSON.stringify(res.body)).not.toContain(OTHER_ID);
+  });
+
+  it('returns 404 to someone outside the connection', async () => {
+    const app = await buildApp();
+    svc.getConnectionMessages.mockResolvedValue(null);
+
+    const res = await auth(request(app).get('/connections/c1/messages'));
+
+    expect(res.status).toBe(404);
+  });
+
+  it('sends as the caller, trimming the text', async () => {
+    const app = await buildApp();
+    svc.sendConnectionMessage.mockResolvedValue({ id: 'm2', text: 'hey', mine: true, createdAt: 2 });
+
+    const res = await auth(request(app).post('/connections/c1/messages')).send({ text: '  hey  ' });
+
+    expect(res.status).toBe(200);
+    expect(svc.sendConnectionMessage).toHaveBeenCalledWith('c1', USER_ID, 'hey');
+  });
+
+  it('rejects empty text without writing', async () => {
+    const app = await buildApp();
+
+    for (const body of [{}, { text: '' }, { text: '   ' }, { text: 42 }]) {
+      const res = await auth(request(app).post('/connections/c1/messages')).send(body);
+      expect(res.status).toBe(400);
+    }
+    expect(svc.sendConnectionMessage).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when sending to a connection the caller is not in', async () => {
+    const app = await buildApp();
+    svc.sendConnectionMessage.mockResolvedValue(null);
+
+    const res = await auth(request(app).post('/connections/c1/messages')).send({ text: 'hey' });
+
+    expect(res.status).toBe(404);
   });
 });

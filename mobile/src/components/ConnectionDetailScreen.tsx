@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, Linking, Alert } from 'react-native';
 import { getConnectionDetail, removeConnection } from '../services/api';
 import type { ConnectionDetailData } from '../services/api';
-import { Screen, SectionLabel, EmptyState, PrimaryButton, TextButton, Spinner, Avatar } from './ui';
+import { Screen, SectionLabel, EmptyState, PrimaryButton, OutlineButton, TextButton, Spinner, Avatar } from './ui';
 
 interface ConnectionDetailScreenProps {
   connectionId: string;
   userId: string;
   onBack: () => void;
   onRemoved: () => void;
+  onMessage: () => void;
 }
 
 export default function ConnectionDetailScreen({
@@ -16,6 +17,7 @@ export default function ConnectionDetailScreen({
   userId,
   onBack,
   onRemoved,
+  onMessage,
 }: ConnectionDetailScreenProps) {
   const [detail, setDetail] = useState<ConnectionDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,11 +108,12 @@ export default function ConnectionDetailScreen({
           </Text>
         </View>
 
-        <PrimaryButton
+        <PrimaryButton label="message" onPress={onMessage} accessibilityLabel="Message" className="mt-8" />
+        <OutlineButton
           label="open on spotify"
           onPress={handleOpenSpotify}
           accessibilityLabel="Open Spotify profile"
-          className="mt-8"
+          className="mt-3"
         />
 
         {list('TOP ARTISTS', profile.topArtists)}

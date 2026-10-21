@@ -261,3 +261,34 @@ export async function removeConnection(
   if (!res.ok) throw new Error(`Remove connection failed: ${res.status}`);
   return res.json();
 }
+
+// --- Connection chat ---
+
+export interface ConnectionMessage {
+  id: string;
+  text: string;
+  /** True for messages the caller sent. */
+  mine: boolean;
+  createdAt: number;
+}
+
+/** Thrown when the connection no longer exists (or the caller isn't in it). */
+export class ConnectionGoneError extends Error {}
+
+export async function getConnectionMessages(connectionId: string): Promise<ConnectionMessage[]> {
+  const res = await authFetch(`${API_BASE}/connections/${connectionId}/messages`);
+  if (res.status === 404) throw new ConnectionGoneError();
+  if (!res.ok) throw new Error(`Get messages failed: ${res.status}`);
+  return (await res.json()).messages;
+}
+
+export async function sendConnectionMessage(connectionId: string, text: string): Promise<ConnectionMessage> {
+  const res = await authFetch(`${API_BASE}/connections/${connectionId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  if (res.status === 404) throw new ConnectionGoneError();
+  if (!res.ok) throw new Error(`Send message failed: ${res.status}`);
+  return (await res.json()).message;
+}
