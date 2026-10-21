@@ -191,6 +191,16 @@ export function More(p: IconProps) {
   );
 }
 
+/** earlier — a clock face, hands at a lazy ten past. */
+export function Clock(p: IconProps) {
+  return (
+    <Frame size={p.size}>
+      <Circle cx={12} cy={12.2} r={8.2} {...stroke(p)} />
+      <Path d="M12 7.4 V12.3 L15.4 14.1" {...stroke(p)} />
+    </Frame>
+  );
+}
+
 /** Reaction type → icon. Server types are unchanged. */
 export const REACTION_ICONS = {
   fire: Flame,

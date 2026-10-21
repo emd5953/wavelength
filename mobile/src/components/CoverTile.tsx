@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View, Image } from 'react-native';
+import { View, Image, Text } from 'react-native';
 import Animated, {
   FadeInDown,
   Easing,
@@ -17,7 +17,7 @@ import { COLORS } from './ui';
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 /** One equalizer bar: rises and falls on its own rhythm, forever. */
-function Bar({ delay, peak }: { delay: number; peak: number }) {
+function Bar({ delay, peak, color }: { delay: number; peak: number; color: string }) {
   const h = useSharedValue(0.25);
   useEffect(() => {
     h.value = withDelay(
@@ -32,19 +32,16 @@ function Bar({ delay, peak }: { delay: number; peak: number }) {
     );
   }, [delay, peak, h]);
   const style = useAnimatedStyle(() => ({ height: `${h.value * 100}%` }));
-  return <Animated.View style={[{ width: 3, borderRadius: 1.5, backgroundColor: COLORS.ink }, style]} />;
+  return <Animated.View style={[{ width: 3, borderRadius: 1.5, backgroundColor: color }, style]} />;
 }
 
-/** Three bars in the corner of a live cover. */
-function Equalizer() {
+/** Three moving bars: in the corner of a live cover, and as the "now" marker. */
+export function Equalizer({ color = COLORS.ink, height = 16, style }: { color?: string; height?: number; style?: object }) {
   return (
-    <View
-      style={{ position: 'absolute', right: 10, bottom: 10, height: 16, flexDirection: 'row', alignItems: 'flex-end', gap: 2.5 }}
-      pointerEvents="none"
-    >
-      <Bar delay={0} peak={0.9} />
-      <Bar delay={140} peak={0.65} />
-      <Bar delay={260} peak={1} />
+    <View style={[{ height, flexDirection: 'row', alignItems: 'flex-end', gap: 2.5 }, style]} pointerEvents="none">
+      <Bar delay={0} peak={0.9} color={color} />
+      <Bar delay={140} peak={0.65} color={color} />
+      <Bar delay={260} peak={1} color={color} />
     </View>
   );
 }
@@ -90,8 +87,14 @@ export default function CoverTile({ play, index, size, onOpen }: CoverTileProps)
             source={{ uri: play.albumArtUrl }}
             style={{ width: '100%', height: '100%', opacity: ageOpacity(play) }}
           />
-          {play.isLive && <Equalizer />}
+          {play.isLive && <Equalizer style={{ position: 'absolute', right: 10, bottom: 10 }} />}
         </Animated.View>
+        <Text className="font-mono-medium text-ink mt-2" style={{ fontSize: play.isLive ? 14 : 12 }} numberOfLines={1}>
+          {play.trackTitle}
+        </Text>
+        <Text className="font-mono text-ink-dim mt-0.5" style={{ fontSize: play.isLive ? 12 : 11 }} numberOfLines={1}>
+          {play.artistName}
+        </Text>
       </PressableScale>
     </Animated.View>
   );
