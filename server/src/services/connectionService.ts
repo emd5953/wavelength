@@ -62,21 +62,8 @@ export class RequestNotFoundError extends Error {
   }
 }
 
-/**
- * Resolve a live broadcast's anonymous id to the user broadcasting it.
- *
- * Anonymous ids rotate per broadcast (broadcastService assigns a fresh one on
- * every insert), so this only resolves while the broadcast is active. A viewer
- * can therefore only address someone whose broadcast they can currently see.
- * Returns null once the broadcast has ended.
- */
-export async function resolveAnonId(anonymousId: string): Promise<string | null> {
-  const result = await pool.query(
-    'SELECT user_id AS "userId" FROM broadcasts WHERE anonymous_id = $1',
-    [anonymousId],
-  );
-  return result.rowCount === 0 ? null : (result.rows[0].userId as string);
-}
+/** Anonymous ids belong to listening sessions; resolution lives with them. */
+export { resolveAnonId } from './sessionService';
 
 /**
  * Load a request and assert the acting user may perform `verb` on it.

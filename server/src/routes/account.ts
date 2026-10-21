@@ -5,6 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { deleteAccount } from '../services/privacyService';
+import { touchPresence } from '../services/sessionService';
 import pool from '../db/connection';
 
 const router = Router();
@@ -35,6 +36,20 @@ router.post('/location', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /account/presence
+ * Heartbeat while the app is open. Keeps (or opens) the caller's listening
+ * session and returns the anonymous id other users see them as.
+ */
+router.post('/presence', async (req: Request, res: Response) => {
+  try {
+    res.json(await touchPresence(req.userId!));
+  } catch (err) {
+    console.error('Presence update failed:', err);
+    res.status(500).json({ error: 'Presence update failed' });
+  }
+});
+
+/**
  * POST /account/push-token
  * Register an Expo push token for notifications.
  */
@@ -57,12 +72,14 @@ router.post('/push-token', async (req: Request, res: Response) => {
 });
 
 /**
- * DELETE /account/:userId
- * Deletes the user account and all associated data.
+ * DELETE /account/me
+ * Deletes the caller's account and all associated data. The path segment is
+ * ignored: the account is always the authenticated caller's, never one named
+ * in the URL.
  */
 router.delete('/:userId', async (req: Request, res: Response) => {
   try {
-    await deleteAccount(req.params.userId);
+    await deleteAccount(req.userId!);
     res.json({ success: true });
   } catch (err) {
     console.error('Account deletion failed:', err);

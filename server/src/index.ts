@@ -8,7 +8,6 @@ import feedRouter from './routes/feed';
 import socialRouter from './routes/social';
 import connectionsRouter from './routes/connections';
 import accountRouter from './routes/account';
-import broadcastRouter from './routes/broadcast';
 import { authMiddleware } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { initFeedSocket } from './services/feedSocket';
@@ -48,7 +47,6 @@ app.use('/feed', authMiddleware, feedRouter);
 app.use('/social', authMiddleware, socialRouter);
 app.use('/connections', authMiddleware, connectionsRouter);
 app.use('/account', authMiddleware, accountRouter);
-app.use('/broadcasts', authMiddleware, broadcastRouter);
 
 initFeedSocket(io);
 
@@ -62,7 +60,7 @@ async function boot() {
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     startScheduler();
-    startSpotifyPoller();
+    startSpotifyPoller(io);
   });
 }
 

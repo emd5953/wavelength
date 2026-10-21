@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { SpotifyAuthModule } from '../src/services/spotifyAuth';
+import { getMyAnonId } from '../src/services/presence';
 import CommentThread from '../src/components/CommentThread';
 
 export default function CommentThreadRoute() {
@@ -8,8 +8,8 @@ export default function CommentThreadRoute() {
   const [viewerAnonId, setViewerAnonId] = useState('');
 
   useEffect(() => {
-    SpotifyAuthModule.getStoredTokens().then((tokens) => {
-      if (tokens) setViewerAnonId(tokens.accessToken);
+    getMyAnonId().then((id) => {
+      if (id) setViewerAnonId(id);
     });
   }, []);
 

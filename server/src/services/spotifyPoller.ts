@@ -1,11 +1,15 @@
 /**
- * Server-side Spotify poller.
- * Polls Spotify for all registered users to check currently playing tracks.
- * Creates/removes broadcasts automatically using last known location.
+ * Server-side Spotify poller — the only writer of plays.
+ * Polls Spotify for all registered users to check currently playing tracks,
+ * and continues, starts, or ends plays at each user's last known location.
  */
 
+import type { Server as SocketIOServer } from 'socket.io';
 import pool from '../db/connection';
-import { createBroadcast, removeBroadcast } from './broadcastService';
+import { recordPlayback, recordNotPlaying } from './broadcastService';
+import { emitBroadcastNew, emitPlaysEnded } from './feedSocket';
+import { notifyRepeatListeners } from './pushService';
+import { repeatTracksStale, syncRepeatTracks } from './tasteService';
 import type {
   SpotifyCurrentlyPlayingResponse,
   SpotifyTokenResponse,
@@ -16,6 +20,7 @@ const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const POLL_INTERVAL = 15_000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let socketServer: SocketIOServer | null = null;
 
 async function refreshTokenIfNeeded(user: any): Promise<string | null> {
   if (new Date(user.token_expires_at) > new Date()) {
@@ -56,20 +61,24 @@ async function pollUser(user: any): Promise<void> {
   const token = await refreshTokenIfNeeded(user);
   if (!token) return;
 
+  if (repeatTracksStale(user.repeat_tracks_synced_at)) {
+    syncRepeatTracks(user.id, token).catch(() => {});
+  }
+
   try {
     const res = await fetch(SPOTIFY_CURRENTLY_PLAYING, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     if (res.status === 204 || !res.ok) {
-      await removeBroadcast(user.id);
+      await endPlayback(user.id);
       return;
     }
 
     const data = (await res.json()) as SpotifyCurrentlyPlayingResponse;
 
     if (!data.is_playing || !data.item) {
-      await removeBroadcast(user.id);
+      await endPlayback(user.id);
       return;
     }
 
@@ -88,16 +97,25 @@ async function pollUser(user: any): Promise<void> {
       timestamp: Date.now(),
     };
 
-    await createBroadcast(user.id, track, location);
+    const { play, change, endedPlayId } = await recordPlayback(user.id, track, location);
+    if (change === 'started') notifyRepeatListeners(user.id, play).catch(() => {});
+    if (!socketServer) return;
+    if (endedPlayId) emitPlaysEnded(socketServer, [endedPlayId]);
+    if (change !== 'continued') await emitBroadcastNew(socketServer, play);
   } catch (err) {
     // Silently fail for individual users
   }
 }
 
+async function endPlayback(userId: string): Promise<void> {
+  const ended = await recordNotPlaying(userId);
+  if (socketServer && ended.length > 0) emitPlaysEnded(socketServer, ended);
+}
+
 async function pollAllUsers(): Promise<void> {
   try {
     const result = await pool.query(
-      'SELECT id, encrypted_access_token, encrypted_refresh_token, token_expires_at, last_latitude, last_longitude FROM users',
+      'SELECT id, encrypted_access_token, encrypted_refresh_token, token_expires_at, last_latitude, last_longitude, repeat_tracks_synced_at FROM users',
     );
 
     await Promise.allSettled(result.rows.map(pollUser));
@@ -106,8 +124,9 @@ async function pollAllUsers(): Promise<void> {
   }
 }
 
-export function startSpotifyPoller(): void {
+export function startSpotifyPoller(io: SocketIOServer): void {
   if (pollTimer) return;
+  socketServer = io;
   console.log('Spotify poller started');
   pollAllUsers();
   pollTimer = setInterval(pollAllUsers, POLL_INTERVAL);

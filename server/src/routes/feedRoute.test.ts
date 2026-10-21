@@ -15,9 +15,9 @@ vi.mock('../db/connection', () => ({
   pool: { query: (...args: any[]) => mockQuery(...args) },
 }));
 
-const mockGetBroadcastsInRadius = vi.fn();
+const mockGetFeedInRadius = vi.fn();
 vi.mock('../services/broadcastService', () => ({
-  getBroadcastsInRadius: (...args: any[]) => mockGetBroadcastsInRadius(...args),
+  getFeedInRadius: (...args: any[]) => mockGetFeedInRadius(...args),
 }));
 
 const mockGetTasteScore = vi.fn();
@@ -49,6 +49,9 @@ function broadcast(overrides: Record<string, unknown> = {}) {
     startedAt: Date.now() - 60_000,
     location: { latitude: 40.7128, longitude: -74.006, accuracy: 0, timestamp: 0 },
     createdAt: Date.now(),
+    trackId: 'track-1',
+    isLive: true,
+    endedAt: null,
     ...overrides,
   };
 }
@@ -57,8 +60,8 @@ beforeEach(() => {
   mockQuery.mockReset();
   // authMiddleware resolves the bearer token to VIEWER_ID.
   mockQuery.mockResolvedValue({ rows: [{ id: VIEWER_ID }] });
-  mockGetBroadcastsInRadius.mockReset();
-  mockGetBroadcastsInRadius.mockResolvedValue([]);
+  mockGetFeedInRadius.mockReset();
+  mockGetFeedInRadius.mockResolvedValue([]);
   mockGetTasteScore.mockReset();
   mockGetTasteScore.mockResolvedValue(0);
 });
@@ -78,7 +81,7 @@ describe('GET /feed/nearby — auth', () => {
     const res = await get(app, '?lat=40&lng=-74', null);
 
     expect(res.status).toBe(401);
-    expect(mockGetBroadcastsInRadius).not.toHaveBeenCalled();
+    expect(mockGetFeedInRadius).not.toHaveBeenCalled();
   });
 
   it('rejects a bearer token that matches no user', async () => {
@@ -88,7 +91,7 @@ describe('GET /feed/nearby — auth', () => {
     const res = await get(app, '?lat=40&lng=-74', 'bogus');
 
     expect(res.status).toBe(401);
-    expect(mockGetBroadcastsInRadius).not.toHaveBeenCalled();
+    expect(mockGetFeedInRadius).not.toHaveBeenCalled();
   });
 });
 
@@ -103,7 +106,7 @@ describe('GET /feed/nearby — coordinates and radius', () => {
     expect((await get(app, '')).status).toBe(400);
     expect((await get(app, '?lat=40')).status).toBe(400);
     expect((await get(app, '?lng=-74')).status).toBe(400);
-    expect(mockGetBroadcastsInRadius).not.toHaveBeenCalled();
+    expect(mockGetFeedInRadius).not.toHaveBeenCalled();
   });
 
   it('returns 400 when lat or lng is not a number', async () => {
@@ -116,28 +119,28 @@ describe('GET /feed/nearby — coordinates and radius', () => {
     const app = await buildApp();
     await get(app, '?lat=40&lng=-74');
 
-    expect(mockGetBroadcastsInRadius.mock.calls[0][1]).toBe(100);
+    expect(mockGetFeedInRadius.mock.calls[0][1]).toBe(100);
   });
 
   it('clamps a radius below the 50m floor', async () => {
     const app = await buildApp();
     await get(app, '?lat=40&lng=-74&radius=5');
 
-    expect(mockGetBroadcastsInRadius.mock.calls[0][1]).toBe(50);
+    expect(mockGetFeedInRadius.mock.calls[0][1]).toBe(50);
   });
 
   it('clamps a radius above the 500m ceiling', async () => {
     const app = await buildApp();
     await get(app, '?lat=40&lng=-74&radius=100000');
 
-    expect(mockGetBroadcastsInRadius.mock.calls[0][1]).toBe(500);
+    expect(mockGetFeedInRadius.mock.calls[0][1]).toBe(500);
   });
 
   it('passes a within-range radius through unchanged', async () => {
     const app = await buildApp();
     await get(app, '?lat=40&lng=-74&radius=250');
 
-    expect(mockGetBroadcastsInRadius.mock.calls[0][1]).toBe(250);
+    expect(mockGetFeedInRadius.mock.calls[0][1]).toBe(250);
   });
 });
 
@@ -150,7 +153,7 @@ describe('GET /feed/nearby — response', () => {
     const app = await buildApp();
     await get(app, '?lat=40&lng=-74');
 
-    const [center, , excludeUserId] = mockGetBroadcastsInRadius.mock.calls[0];
+    const [center, , excludeUserId] = mockGetFeedInRadius.mock.calls[0];
     expect(excludeUserId).toBe(VIEWER_ID);
     expect(center.latitude).toBe(40);
     expect(center.longitude).toBe(-74);
@@ -158,7 +161,7 @@ describe('GET /feed/nearby — response', () => {
 
   it('never leaks a broadcaster userId to the client', async () => {
     const app = await buildApp();
-    mockGetBroadcastsInRadius.mockResolvedValue([broadcast(), broadcast({ id: 'b2' })]);
+    mockGetFeedInRadius.mockResolvedValue([broadcast(), broadcast({ id: 'b2' })]);
 
     const res = await get(app, '?lat=40&lng=-74');
 
@@ -170,24 +173,36 @@ describe('GET /feed/nearby — response', () => {
     }
   });
 
-  it('fuzzes the broadcast location away from the true coordinates', async () => {
+  it('returns the exact play location (no fuzzing, by decision 2026-10-21)', async () => {
     const app = await buildApp();
     const truth = { latitude: 40.7128, longitude: -74.006, accuracy: 0, timestamp: 0 };
-    mockGetBroadcastsInRadius.mockResolvedValue([broadcast({ location: { ...truth } })]);
+    mockGetFeedInRadius.mockResolvedValue([broadcast({ location: { ...truth } })]);
 
     const res = await get(app, '?lat=40&lng=-74');
-    const returned = res.body.broadcasts[0].location;
 
-    expect(returned.latitude).not.toBe(truth.latitude);
-    expect(returned.longitude).not.toBe(truth.longitude);
-    // Offset is 100–200m, so well under a tenth of a degree of latitude.
-    expect(Math.abs(returned.latitude - truth.latitude)).toBeLessThan(0.01);
+    expect(res.body.broadcasts[0].location).toEqual(truth);
+  });
+
+  it('passes through live state and order from the service', async () => {
+    const app = await buildApp();
+    const endedAt = Date.now() - 10 * 60_000;
+    mockGetFeedInRadius.mockResolvedValue([
+      broadcast({ id: 'live' }),
+      broadcast({ id: 'recent', isLive: false, endedAt }),
+    ]);
+
+    const res = await get(app, '?lat=40&lng=-74');
+
+    expect(res.body.broadcasts.map((b: any) => [b.id, b.isLive, b.endedAt])).toEqual([
+      ['live', true, null],
+      ['recent', false, endedAt],
+    ]);
   });
 
   it('includes timeSinceStart and the taste score for each broadcast', async () => {
     const app = await buildApp();
     const startedAt = Date.now() - 30_000;
-    mockGetBroadcastsInRadius.mockResolvedValue([broadcast({ startedAt })]);
+    mockGetFeedInRadius.mockResolvedValue([broadcast({ startedAt })]);
     mockGetTasteScore.mockResolvedValue(42);
 
     const res = await get(app, '?lat=40&lng=-74');
@@ -200,7 +215,7 @@ describe('GET /feed/nearby — response', () => {
   it('scores taste between the viewer and each broadcaster', async () => {
     const app = await buildApp();
     const otherId = '33333333-3333-4333-8333-333333333333';
-    mockGetBroadcastsInRadius.mockResolvedValue([broadcast({ userId: otherId })]);
+    mockGetFeedInRadius.mockResolvedValue([broadcast({ userId: otherId })]);
 
     await get(app, '?lat=40&lng=-74');
 
@@ -218,7 +233,7 @@ describe('GET /feed/nearby — response', () => {
   it('returns 500 when the broadcast lookup fails', async () => {
     const app = await buildApp();
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockGetBroadcastsInRadius.mockRejectedValue(new Error('postgis down'));
+    mockGetFeedInRadius.mockRejectedValue(new Error('postgis down'));
 
     const res = await get(app, '?lat=40&lng=-74');
 

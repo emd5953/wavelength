@@ -46,7 +46,7 @@ function sendRequestError(res: Response, err: unknown, logLabel: string): void {
 // --- Connection Request endpoints ---
 // Declared before GET /:id, which would otherwise match /requests.
 
-/** POST /connections/requests — send a connection request to a live broadcast */
+/** POST /connections/requests — send a connection request to a listener in the feed */
 router.post('/requests', async (req: Request, res: Response) => {
   const { broadcasterAnonId } = req.body;
   if (!broadcasterAnonId) {
@@ -57,7 +57,7 @@ router.post('/requests', async (req: Request, res: Response) => {
   try {
     const broadcasterUserId = await resolveAnonId(broadcasterAnonId);
     if (!broadcasterUserId) {
-      res.status(404).json({ error: 'That broadcast is no longer active' });
+      res.status(404).json({ error: 'That listener is no longer in the feed' });
       return;
     }
 

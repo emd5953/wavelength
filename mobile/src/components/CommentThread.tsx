@@ -23,7 +23,7 @@ export default function CommentThread({ broadcastId, viewerAnonId }: CommentThre
     if (!text.trim() || sending) return;
     setSending(true);
     try {
-      const res = await addComment(broadcastId, viewerAnonId, text.trim());
+      const res = await addComment(broadcastId, text.trim());
       setComments((prev) => [...prev, res.comment]);
       setText('');
     } catch {

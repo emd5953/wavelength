@@ -1,6 +1,6 @@
 /**
  * WebSocket client for real-time feed updates.
- * Listens for broadcast:new and broadcast:removed events.
+ * Listens for broadcast:new and broadcast:ended events.
  * Sends location:update to re-subscribe to nearby broadcasts.
  * Requirement: 4.2
  */
@@ -14,7 +14,8 @@ let socket: Socket | null = null;
 
 export type FeedEventCallback = {
   onBroadcastNew?: (broadcast: FeedBroadcast) => void;
-  onBroadcastRemoved?: (broadcastId: string) => void;
+  /** A play stopped being live; it stays in the feed as recently played. */
+  onBroadcastEnded?: (broadcastId: string) => void;
   onConnectionRequest?: (request: ConnectionRequestData) => void;
   onConnectionAccepted?: (connection: ConnectionData) => void;
   onConnectionDeclined?: (requestId: string) => void;
@@ -29,8 +30,8 @@ export function connectFeedSocket(callbacks: FeedEventCallback): Socket {
     callbacks.onBroadcastNew?.(broadcast);
   });
 
-  socket.on('broadcast:removed', (broadcastId: string) => {
-    callbacks.onBroadcastRemoved?.(broadcastId);
+  socket.on('broadcast:ended', (broadcastId: string) => {
+    callbacks.onBroadcastEnded?.(broadcastId);
   });
 
   socket.on('connection:request', (request: ConnectionRequestData) => {

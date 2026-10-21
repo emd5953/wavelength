@@ -23,6 +23,9 @@ const ALLOWED_BROADCAST_KEYS = new Set([
   'startedAt',
   'location',
   'createdAt',
+  'trackId',
+  'isLive',
+  'endedAt',
 ]);
 
 /** Simulate building a broadcast payload (mirrors createBroadcast output) */
@@ -44,6 +47,9 @@ function buildBroadcastPayload(
       timestamp: location.timestamp,
     },
     createdAt: Date.now(),
+    trackId: "track-id",
+    isLive: true,
+    endedAt: null,
   };
 }
 

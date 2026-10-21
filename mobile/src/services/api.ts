@@ -30,6 +30,10 @@ export interface FeedBroadcast {
   startedAt: number;
   timeSinceStart: number;
   createdAt: number;
+  /** True while the listener is still playing this track. */
+  isLive: boolean;
+  /** When the play ended, or null while live. */
+  endedAt: number | null;
   location?: {
     latitude: number;
     longitude: number;
@@ -75,15 +79,27 @@ export interface DMMessage {
   includesConnectionRequest: boolean;
 }
 
+/**
+ * Heartbeat while the app is open. Keeps the caller's listening session alive
+ * and returns the anonymous id other users see them as.
+ */
+export async function sendPresence(): Promise<{ anonymousId: string }> {
+  const res = await authFetch(`${API_BASE}/account/presence`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Presence failed: ${res.status}`);
+  return res.json();
+}
+
+// The server derives the caller's anonymous id from their session; the
+// social calls below never send one.
+
 export async function addReaction(
   broadcastId: string,
-  viewerAnonId: string,
   type: string,
 ): Promise<{ counts: ReactionCount }> {
   const res = await authFetch(`${API_BASE}/social/reactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ broadcastId, viewerAnonId, type }),
+    body: JSON.stringify({ broadcastId, type }),
   });
   if (!res.ok) throw new Error(`Add reaction failed: ${res.status}`);
   return res.json();
@@ -97,13 +113,12 @@ export async function getReactionCounts(broadcastId: string): Promise<{ counts: 
 
 export async function addComment(
   broadcastId: string,
-  authorAnonId: string,
   text: string,
 ): Promise<{ comment: Comment }> {
   const res = await authFetch(`${API_BASE}/social/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ broadcastId, authorAnonId, text }),
+    body: JSON.stringify({ broadcastId, text }),
   });
   if (!res.ok) throw new Error(`Add comment failed: ${res.status}`);
   return res.json();
@@ -116,7 +131,6 @@ export async function getComments(broadcastId: string): Promise<{ comments: Comm
 }
 
 export async function sendDM(
-  senderAnonId: string,
   recipientAnonId: string,
   text: string,
   includesConnectionRequest: boolean = false,
@@ -124,17 +138,15 @@ export async function sendDM(
   const res = await authFetch(`${API_BASE}/social/dms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ senderAnonId, recipientAnonId, text, includesConnectionRequest }),
+    body: JSON.stringify({ recipientAnonId, text, includesConnectionRequest }),
   });
   if (!res.ok) throw new Error(`Send DM failed: ${res.status}`);
   return res.json();
 }
 
-export async function getDMThread(
-  participantA: string,
-  participantB: string,
-): Promise<{ messages: DMMessage[] }> {
-  const res = await authFetch(`${API_BASE}/social/dms/${participantA}/${participantB}`);
+/** The caller's thread with another listener, across all of the caller's sessions. */
+export async function getDMThread(otherAnonId: string): Promise<{ messages: DMMessage[] }> {
+  const res = await authFetch(`${API_BASE}/social/dms/${otherAnonId}`);
   if (!res.ok) throw new Error(`Get DM thread failed: ${res.status}`);
   return res.json();
 }

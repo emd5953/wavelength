@@ -16,7 +16,7 @@ const slides = [
   {
     emoji: '📍',
     title: 'Location-Based\nDiscovery',
-    body: 'See music playing in cafes, gyms, parks — anywhere nearby. Your exact location is never shared.',
+    body: 'See music playing in cafes, gyms, parks — anywhere nearby. People nearby can see where you\'re listening on the map.',
     gradient: ['#B91C1C', '#991B1B', '#1a0a0a'] as const,
   },
   {
