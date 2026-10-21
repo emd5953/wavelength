@@ -134,3 +134,28 @@ The first two need **one native rebuild**.
 3. Nearby crate grid: live equalizer, age fade, entrance and press motion.
 4. Play screen: hero art, reaction icons with burst and haptics.
 5. Map header, people grid, the "you" radius rings, empty-state illustration.
+
+## Status
+
+Milestones 1–5 built on the `art-first` branch.
+Screenshot-checked in the simulator: nearby, map, people, you, and the
+connection profile. **Not yet seen on screen:** the play screen and the
+reaction burst animations, which only open from a tap, and haptics, which
+need a real device.
+
+What moved from the spec, in response to review:
+
+- **Some words came back, by request.** Every page names itself beside the
+  mark (`people`, `you`). Nearby and map show the place instead (a pin plus
+  the landmark, street, or district from reverse geocoding, refreshed after
+  moving 200m). The crate has `now` / `earlier` markers (the live equalizer
+  and a hand-drawn clock), and track plus artist under every cover. The radius
+  is always labeled, and icon buttons carry one-word captions.
+- **The crate is two tiers:** now covers are large (2 across), earlier covers
+  small (3 across). Size, not labels, does most of the separating.
+- **`waves` was redrawn as a single waveform** (the first draft read as the
+  Wi-Fi symbol) and became the official app icon (`mobile/assets/icon.svg` →
+  `icon.png`). `hands` was redrawn after reading as an onion; it's still the
+  weakest icon.
+- The tab bar has no labels; its dot springs between tabs.
+- `FeedHeader` and `BroadcastRow` were removed as unused.
