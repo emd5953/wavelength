@@ -1,16 +1,16 @@
-import * as AuthSession from 'expo-auth-session';
-import * as SecureStore from 'expo-secure-store';
-import * as WebBrowser from 'expo-web-browser';
-import { SPOTIFY_CONFIG } from '../config/spotify';
+import * as AuthSession from "expo-auth-session";
+import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import { SPOTIFY_CONFIG } from "../config/spotify";
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const TOKEN_KEYS = {
-  accessToken: 'spotify_access_token',
-  refreshToken: 'spotify_refresh_token',
-  expiresAt: 'spotify_expires_at',
+  accessToken: "spotify_access_token",
+  refreshToken: "spotify_refresh_token",
+  expiresAt: "spotify_expires_at",
 } as const;
 
 export interface SpotifyTokens {
@@ -27,22 +27,22 @@ export const SpotifyAuthModule = {
       redirectUri: SPOTIFY_CONFIG.redirectUri,
       usePKCE: false,
       responseType: AuthSession.ResponseType.Code,
-      extraParams: { show_dialog: 'true' },
+      extraParams: { show_dialog: "true" },
     });
 
     const result = await request.promptAsync(SPOTIFY_CONFIG.discovery);
 
-    if (result.type !== 'success' || !result.params.code) {
-      console.log('AUTH RESULT:', result.type);
+    if (result.type !== "success" || !result.params.code) {
+      console.log("AUTH RESULT:", result.type);
       return null;
     }
 
-    console.log('GOT AUTH CODE, sending to server...');
+    console.log("GOT AUTH CODE, sending to server...");
 
     // Send code to our server to exchange for tokens
     const res = await fetch(`${API_BASE}/auth/callback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         code: result.params.code,
         redirectUri: SPOTIFY_CONFIG.redirectUri,
@@ -51,7 +51,7 @@ export const SpotifyAuthModule = {
 
     if (!res.ok) {
       const err = await res.text();
-      console.error('Server auth callback failed:', err);
+      console.error("Server auth callback failed:", err);
       return null;
     }
 
@@ -66,39 +66,42 @@ export const SpotifyAuthModule = {
     return tokens;
   },
 
-  async refreshToken(refreshTokenValue?: string): Promise<SpotifyTokens | null> {
-    const rt = refreshTokenValue ?? (await SecureStore.getItemAsync(TOKEN_KEYS.refreshToken));
+  async refreshToken(
+    refreshTokenValue?: string,
+  ): Promise<SpotifyTokens | null> {
+    const rt =
+      refreshTokenValue ??
+      (await SecureStore.getItemAsync(TOKEN_KEYS.refreshToken));
     if (!rt) {
       await clearTokens();
       return null;
     }
 
-    try {
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: rt }),
-      });
+    // Network failures propagate without erasing the stored refresh token.
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: rt }),
+    });
 
-      if (!res.ok) {
+    if (!res.ok) {
+      if ([400, 401, 403].includes(res.status)) {
         await clearTokens();
         return null;
       }
-
-      const data = await res.json();
-      const stored = await getStoredTokens();
-      const tokens: SpotifyTokens = {
-        accessToken: data.accessToken,
-        refreshToken: stored?.refreshToken ?? rt,
-        expiresAt: data.expiresAt,
-      };
-
-      await storeTokens(tokens);
-      return tokens;
-    } catch {
-      await clearTokens();
-      return null;
+      throw new Error("Spotify refresh is temporarily unavailable");
     }
+
+    const data = await res.json();
+    const stored = await getStoredTokens();
+    const tokens: SpotifyTokens = {
+      accessToken: data.accessToken,
+      refreshToken: stored?.refreshToken ?? rt,
+      expiresAt: data.expiresAt,
+    };
+
+    await storeTokens(tokens);
+    return tokens;
   },
 
   async getValidToken(): Promise<string | null> {
@@ -125,7 +128,10 @@ export const SpotifyAuthModule = {
 async function storeTokens(tokens: SpotifyTokens): Promise<void> {
   await SecureStore.setItemAsync(TOKEN_KEYS.accessToken, tokens.accessToken);
   await SecureStore.setItemAsync(TOKEN_KEYS.refreshToken, tokens.refreshToken);
-  await SecureStore.setItemAsync(TOKEN_KEYS.expiresAt, String(tokens.expiresAt));
+  await SecureStore.setItemAsync(
+    TOKEN_KEYS.expiresAt,
+    String(tokens.expiresAt),
+  );
 }
 
 async function getStoredTokens(): Promise<SpotifyTokens | null> {

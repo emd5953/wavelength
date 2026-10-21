@@ -1,93 +1,159 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useState } from "react";
+import { FlatList, TouchableOpacity, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
-import { getConnections } from '../services/api';
-import type { ConnectionListItem } from '../services/api';
-
-interface ConnectionsListScreenProps {
-  userId: string;
-  onSelectConnection: (connectionId: string) => void;
-}
-
-export default function ConnectionsListScreen({
-  userId,
-  onSelectConnection,
-}: ConnectionsListScreenProps) {
+  ConnectionListItem,
+  friendlyError,
+  getConnections,
+} from "../services/api";
+import {
+  Avatar,
+  BottomNav,
+  Button,
+  Copy,
+  EmptyState,
+  Icon,
+  IconButton,
+  Label,
+  Notice,
+  Title,
+  color,
+  styles,
+} from "../design/ui";
+import { DEMO_MODE } from "../dev/demo";
+export default function ConnectionsListScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [connections, setConnections] = useState<ConnectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const loadConnections = useCallback(async () => {
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getConnections();
-      setConnections(data.connections);
-    } catch {
-      // silently fail
+      const res = await getConnections();
+      setConnections(res.connections);
+      setError("");
+    } catch (e) {
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
-
-  useEffect(() => {
-    loadConnections();
-  }, [loadConnections]);
-
-  const renderItem = ({ item }: { item: ConnectionListItem }) => (
-    <TouchableOpacity
-      className="flex-row items-center p-4 mx-4 my-1.5 rounded-2xl"
-      style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-      onPress={() => onSelectConnection(item.id)}
-      accessibilityLabel={`View profile of ${item.displayName}`}
-      accessibilityRole="button"
-    >
-      <Image
-        source={{ uri: item.profileImageUrl }}
-        className="w-12 h-12 rounded-full"
-        style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 2, borderColor: '#DC2626' }}
-        accessibilityLabel={`${item.displayName} profile image`}
-      />
-      <View className="ml-3.5 flex-1">
-        <Text className="text-base font-bold text-white">{item.displayName}</Text>
-        <Text className="text-xs text-white/35 mt-0.5">
-          Connected {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
-      </View>
-      <Text className="text-white/30 text-lg">›</Text>
-    </TouchableOpacity>
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
   );
-
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center" style={{ backgroundColor: '#1a0a0a' }}>
-        <ActivityIndicator size="large" color="#DC2626" />
-      </View>
-    );
-  }
-
   return (
-    <View className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
+    <View style={styles.screen}>
+      <View
+        style={{
+          paddingHorizontal: 24,
+          paddingTop: DEMO_MODE ? 12 : insets.top + 12,
+          paddingBottom: 22,
+        }}
+      >
+        <View style={styles.row}>
+          <Label style={{ color: color.coral }}>YOUR PEOPLE</Label>
+          <IconButton
+            name="inbox"
+            label="Connection requests"
+            onPress={() => router.push("/connection-requests")}
+          />
+        </View>
+        <Title style={{ fontSize: 38, lineHeight: 43, marginTop: 12 }}>
+          {"On your\nwavelength."}
+        </Title>
+        <Copy style={{ color: color.muted, marginTop: 12 }}>
+          A little less stranger. A little more in sync.
+        </Copy>
+      </View>
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        onRefresh={load}
+        refreshing={loading}
+        contentContainerStyle={{ flexGrow: 1, padding: 24, paddingTop: 4 }}
+        ListHeaderComponent={
+          <>
+            {error && (
+              <>
+                <Notice error message={error} />
+                <Button title="Try again" secondary onPress={load} />
+              </>
+            )}
+            <Label style={{ paddingVertical: 14 }}>
+              {error && !connections.length
+                ? "CONNECTIONS UNAVAILABLE"
+                : loading && !connections.length
+                  ? "CHECKING CONNECTIONS"
+                  : `${connections.length} MUTUAL ${connections.length === 1 ? "CONNECTION" : "CONNECTIONS"}`}
+            </Label>
+          </>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`View ${item.displayName || "connected listener"} profile`}
+            onPress={() =>
+              router.push({
+                pathname: "/connection-detail",
+                params: { connectionId: item.id },
+              })
+            }
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 14,
+              paddingVertical: 22,
+              borderBottomWidth: 1,
+              borderBottomColor: color.line,
+            }}
+          >
+            <Avatar id={item.id} uri={item.profileImageUrl} size={60} />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{ color: color.paper, fontSize: 22, fontWeight: "700" }}
+              >
+                {item.displayName || "Connected listener"}
+              </Text>
+              <Copy style={{ fontSize: 12, color: color.muted }}>
+                Connected{" "}
+                {new Date(item.createdAt).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </Copy>
+            </View>
+            <Icon name="arrow-up-right" tint={color.coral} />
+          </TouchableOpacity>
+        )}
         ListEmptyComponent={
-          <View className="items-center mt-16">
-            <Text style={{ fontSize: 32 }}>🤝</Text>
-            <Text className="text-white/35 mt-3 text-sm">No connections yet</Text>
-            <Text className="text-white/25 text-xs mt-1 text-center px-8">
-              Send connection requests through DMs to reveal Spotify profiles
-            </Text>
+          !error ? (
+            <EmptyState
+              loading={loading}
+              title={
+                loading ? "Finding your people…" : "It starts with a song."
+              }
+              body="When a connection request is accepted, you’ll find their Spotify profile here."
+              action={loading ? undefined : "Discover nearby listeners"}
+              onAction={() => router.replace("/nearby-feed")}
+            />
+          ) : null
+        }
+        ListFooterComponent={
+          <View style={{ marginTop: 24 }}>
+            <Button
+              title="View connection requests"
+              secondary
+              icon="inbox"
+              onPress={() => router.push("/connection-requests")}
+            />
           </View>
         }
-        contentContainerStyle={{ paddingVertical: 8 }}
-        showsVerticalScrollIndicator={false}
       />
+      <BottomNav active="connections" />
     </View>
   );
 }

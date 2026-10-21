@@ -1,19 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
-import { getMyAnonId } from '../src/services/presence';
-import CommentThread from '../src/components/CommentThread';
-
+import { useEffect, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import { getMyAnonId } from "../src/services/presence";
+import CommentThread from "../src/components/CommentThread";
+import { EmptyState } from "../src/design/ui";
+import { DEMO_MODE } from "../src/dev/demo";
 export default function CommentThreadRoute() {
   const { broadcastId } = useLocalSearchParams<{ broadcastId: string }>();
-  const [viewerAnonId, setViewerAnonId] = useState('');
-
+  const [viewerAnonId, setViewerAnonId] = useState("");
   useEffect(() => {
-    getMyAnonId().then((id) => {
-      if (id) setViewerAnonId(id);
-    });
+    if (!DEMO_MODE) getMyAnonId().then((id) => setViewerAnonId(id ?? ""));
   }, []);
-
-  if (!broadcastId || !viewerAnonId) return null;
-
-  return <CommentThread broadcastId={broadcastId} viewerAnonId={viewerAnonId} />;
+  return broadcastId ? (
+    <CommentThread broadcastId={broadcastId} viewerAnonId={viewerAnonId} />
+  ) : (
+    <EmptyState
+      title="Choose a play"
+      body="Open a track from Nearby to read its comments."
+    />
+  );
 }

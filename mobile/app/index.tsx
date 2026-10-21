@@ -1,105 +1,136 @@
-import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { SpotifyAuthModule } from '../src/services/spotifyAuth';
-import { ONBOARDING_KEY } from './onboarding';
-
+import { useEffect, useState } from "react";
+import { View, Text, ScrollView } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { SpotifyAuthModule } from "../src/services/spotifyAuth";
+import { DEMO_MODE } from "../src/dev/demo";
+import { ONBOARDING_KEY } from "./onboarding";
+import {
+  Button,
+  Copy,
+  EmptyState,
+  Label,
+  Notice,
+  Wave,
+  color,
+  styles,
+  type,
+} from "../src/design/ui";
 export default function LoginScreen() {
+  const { signin } = useLocalSearchParams<{ signin?: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [checking, setChecking] = useState(true);
   const [loggingIn, setLoggingIn] = useState(false);
-
+  const [error, setError] = useState("");
   useEffect(() => {
     (async () => {
       try {
-        const onboarded = await SecureStore.getItemAsync(ONBOARDING_KEY);
-        if (!onboarded) {
-          router.replace('/onboarding');
+        if (DEMO_MODE) {
+          setChecking(false);
           return;
         }
-
-        const tokens = await SpotifyAuthModule.getStoredTokens();
-        if (tokens && Date.now() < tokens.expiresAt) {
-          router.replace('/nearby-feed');
-        } else {
-          setChecking(false);
+        if (!(await SecureStore.getItemAsync(ONBOARDING_KEY))) {
+          router.replace("/onboarding");
+          return;
         }
-      } catch (e) {
-        console.warn('Startup check failed:', e);
-        setChecking(false);
+        const token =
+          signin === "1" ? null : await SpotifyAuthModule.getValidToken();
+        if (token) {
+          router.replace("/nearby-feed");
+          return;
+        }
+      } catch {
+        setError("We couldn’t restore your session. Please sign in again.");
       }
+      setChecking(false);
     })();
-  }, []);
-
-  const handleLogin = async () => {
+  }, [signin]);
+  const login = async () => {
+    if (DEMO_MODE) {
+      setError("Preview only. Open the regular app to sign in with Spotify.");
+      return;
+    }
     setLoggingIn(true);
+    setError("");
     try {
       const tokens = await SpotifyAuthModule.login();
-      if (tokens) {
-        router.replace('/nearby-feed');
-      }
+      if (tokens) router.replace("/nearby-feed");
+      else
+        setError(
+          "Sign-in wasn’t completed. You can try again whenever you’re ready.",
+        );
+    } catch {
+      setError(
+        "Couldn’t connect to Spotify. Check your connection and try again.",
+      );
     } finally {
       setLoggingIn(false);
     }
   };
-
-  if (checking) {
+  if (checking)
     return (
-      <LinearGradient colors={['#DC2626', '#991B1B', '#1a0a0a']} className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#fff" />
-      </LinearGradient>
-    );
-  }
-
-  return (
-    <LinearGradient colors={['#DC2626', '#B91C1C', '#7F1D1D', '#1a0a0a']} locations={[0, 0.3, 0.6, 1]} className="flex-1">
-      <View className="flex-1 justify-center items-center px-8">
-        {/* Logo */}
-        <View
-          className="w-28 h-28 rounded-3xl items-center justify-center mb-10"
-          style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' }}
-        >
-          <Text style={{ fontSize: 52 }}>🎵</Text>
-        </View>
-
-        <Text className="text-5xl font-extrabold text-white tracking-tight mb-3">Wavelength</Text>
-        <Text className="text-lg text-white/80 text-center leading-7 mb-2">
-          Discover what people near you{'\n'}are listening to
-        </Text>
-        <Text className="text-sm text-white/40 text-center mb-12">
-          Anonymous · Location-based · Real-time
-        </Text>
-
-        {/* Login button — white pill */}
-        <TouchableOpacity
-          className="w-full py-4 rounded-2xl items-center"
-          style={{
-            backgroundColor: '#fff',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.3,
-            shadowRadius: 16,
-          }}
-          onPress={handleLogin}
-          disabled={loggingIn}
-          accessibilityRole="button"
-          accessibilityLabel="Log in with Spotify"
-        >
-          {loggingIn ? (
-            <ActivityIndicator size="small" color="#DC2626" />
-          ) : (
-            <Text style={{ color: '#DC2626', fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }}>
-              Log in with Spotify
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <Text className="text-xs text-white/30 text-center mt-8 leading-5">
-          By continuing, you agree to share your{'\n'}currently playing track anonymously
-        </Text>
+      <View style={[styles.screen, { justifyContent: "center" }]}>
+        <EmptyState loading title="Finding your frequency" />
       </View>
+    );
+  return (
+    <LinearGradient
+      colors={["#322320", color.ink, color.ink]}
+      style={{ flex: 1 }}
+    >
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: "center",
+          padding: 30,
+          paddingTop: insets.top + 48,
+          paddingBottom: insets.bottom + 24,
+        }}
+      >
+        <Wave size={90} />
+        <Label style={{ marginTop: 40, color: color.coral }}>
+          THE SOUND OF THE ROOM
+        </Label>
+        <Text
+          style={[
+            type.display,
+            { color: color.paper, marginTop: 16, marginBottom: 20 },
+          ]}
+        >
+          {"You’re in\ngood company."}
+        </Text>
+        <Copy style={{ color: color.muted, marginBottom: 38 }}>
+          A shared song. A nearby stranger. The start of something unexpected.
+        </Copy>
+        <Button
+          title="Continue with Spotify"
+          icon="music"
+          busy={loggingIn}
+          onPress={login}
+        />
+        {error && <Notice error message={error} />}
+        <Copy
+          style={{
+            color: color.muted,
+            fontSize: 13,
+            lineHeight: 20,
+            marginTop: 22,
+          }}
+        >
+          When you use discovery, nearby listeners can see your tracks and exact
+          location. Your Spotify profile is revealed only when you both connect.
+        </Copy>
+        <View style={{ marginTop: 32 }}>
+          <Button
+            secondary
+            title="Explore how it works"
+            onPress={() => router.push("/onboarding")}
+          />
+        </View>
+      </ScrollView>
     </LinearGradient>
   );
 }

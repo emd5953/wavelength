@@ -16,6 +16,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.anonymous.wavelength"
-    }
+    },
+    "userInterfaceStyle": "dark"
   }
 }

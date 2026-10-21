@@ -1,226 +1,285 @@
-import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useCallback, useState } from "react";
+import { FlatList, Pressable, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  acceptConnectionRequest,
+  cancelConnectionRequest,
+  ConnectionRequestData,
+  declineConnectionRequest,
+  friendlyError,
   getIncomingRequests,
   getOutgoingRequests,
-  acceptConnectionRequest,
-  declineConnectionRequest,
-  cancelConnectionRequest,
-} from '../services/api';
-import type { ConnectionRequestData } from '../services/api';
-
-type Tab = 'incoming' | 'outgoing';
-
-interface ConnectionRequestScreenProps {
-  userId: string;
-}
-
-function formatTimeLeft(expiresAt: number): string {
-  const ms = expiresAt - Date.now();
-  if (ms <= 0) return 'Expired';
-  const hours = Math.floor(ms / 3_600_000);
-  const minutes = Math.floor((ms % 3_600_000) / 60_000);
-  if (hours > 0) return `${hours}h ${minutes}m left`;
-  return `${minutes}m left`;
-}
-
-export default function ConnectionRequestScreen({ userId }: ConnectionRequestScreenProps) {
-  const [tab, setTab] = useState<Tab>('incoming');
+} from "../services/api";
+import {
+  Avatar,
+  Button,
+  Copy,
+  EmptyState,
+  Entrance,
+  feedback,
+  Label,
+  Notice,
+  Sheet,
+  Title,
+  Wave,
+  color,
+  styles,
+} from "../design/ui";
+export default function ConnectionRequestScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState<"incoming" | "outgoing">("incoming");
   const [incoming, setIncoming] = useState<ConnectionRequestData[]>([]);
   const [outgoing, setOutgoing] = useState<ConnectionRequestData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  const loadRequests = useCallback(async () => {
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [inc, out] = await Promise.all([
         getIncomingRequests(),
         getOutgoingRequests(),
       ]);
-      setIncoming(inc.requests.filter((r) => r.status === 'pending'));
-      setOutgoing(out.requests.filter((r) => r.status === 'pending'));
-    } catch {
-      // silently fail
+      setIncoming(inc.requests);
+      setOutgoing(out.requests);
+      setError("");
+    } catch (e) {
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
-
-  useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
-
-  const handleAccept = async (requestId: string) => {
-    setActionLoading(requestId);
-    try {
-      await acceptConnectionRequest(requestId);
-      setIncoming((prev) => prev.filter((r) => r.id !== requestId));
-    } catch {} finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleDecline = async (requestId: string) => {
-    setActionLoading(requestId);
-    try {
-      await declineConnectionRequest(requestId);
-      setIncoming((prev) => prev.filter((r) => r.id !== requestId));
-    } catch {} finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleCancel = async (requestId: string) => {
-    setActionLoading(requestId);
-    try {
-      await cancelConnectionRequest(requestId);
-      setOutgoing((prev) => prev.filter((r) => r.id !== requestId));
-    } catch {} finally {
-      setActionLoading(null);
-    }
-  };
-
-  const renderIncomingItem = ({ item }: { item: ConnectionRequestData }) => (
-    <View
-      className="mx-4 my-1.5 p-4 rounded-2xl"
-      style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-    >
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1">
-          <Text className="text-base text-white/80 font-medium">Anonymous listener</Text>
-          <View className="flex-row items-center mt-1 gap-1">
-            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#DC2626' }} />
-            <Text className="text-xs text-white/35">{formatTimeLeft(item.expiresAt)}</Text>
-          </View>
-        </View>
-      </View>
-      <View className="flex-row gap-2 mt-3">
-        <TouchableOpacity
-          className="flex-1 py-3 rounded-xl items-center"
-          style={{ backgroundColor: '#DC2626' }}
-          onPress={() => handleAccept(item.id)}
-          disabled={actionLoading === item.id}
-          accessibilityLabel="Accept connection request"
-          accessibilityRole="button"
-        >
-          {actionLoading === item.id ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text className="text-white font-bold text-sm">Accept</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          className="flex-1 py-3 rounded-xl items-center"
-          style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
-          onPress={() => handleDecline(item.id)}
-          disabled={actionLoading === item.id}
-          accessibilityLabel="Decline connection request"
-          accessibilityRole="button"
-        >
-          <Text className="text-white/60 text-sm font-medium">Decline</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      const clock = setInterval(() => setNow(Date.now()), 30000);
+      const poll = setInterval(load, 30000);
+      return () => {
+        clearInterval(clock);
+        clearInterval(poll);
+      };
+    }, [load]),
   );
-
-  const renderOutgoingItem = ({ item }: { item: ConnectionRequestData }) => (
-    <View
-      className="mx-4 my-1.5 p-4 rounded-2xl"
-      style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-    >
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1">
-          <Text className="text-base text-white/80 font-medium">Pending request</Text>
-          <View className="flex-row items-center mt-1 gap-1">
-            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#DC2626' }} />
-            <Text className="text-xs text-white/35">{formatTimeLeft(item.expiresAt)}</Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          className="px-4 py-2.5 rounded-xl"
-          style={{ borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)' }}
-          onPress={() => handleCancel(item.id)}
-          disabled={actionLoading === item.id}
-          accessibilityLabel="Cancel connection request"
-          accessibilityRole="button"
-        >
-          {actionLoading === item.id ? (
-            <ActivityIndicator size="small" color="#ef4444" />
-          ) : (
-            <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600' }}>Cancel</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center" style={{ backgroundColor: '#1a0a0a' }}>
-        <ActivityIndicator size="large" color="#DC2626" />
-      </View>
-    );
-  }
-
+  const act = async (
+    item: ConnectionRequestData,
+    action: "accept" | "decline" | "cancel",
+  ) => {
+    setBusy(item.id);
+    setError("");
+    try {
+      if (action === "accept") {
+        const { connection } = await acceptConnectionRequest(item.id);
+        setRevealed(connection.id);
+        feedback(true);
+      } else if (action === "decline") await declineConnectionRequest(item.id);
+      else await cancelConnectionRequest(item.id);
+      const change = (prev: ConnectionRequestData[]) =>
+        prev.map((r) =>
+          r.id === item.id
+            ? {
+                ...r,
+                status: (action === "accept"
+                  ? "accepted"
+                  : action === "decline"
+                    ? "declined"
+                    : "cancelled") as ConnectionRequestData["status"],
+              }
+            : r,
+        );
+      setIncoming(change);
+      setOutgoing(change);
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setBusy("");
+    }
+  };
   return (
-    <View className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
-      {/* Tab bar — frosted glass */}
-      <View
-        className="flex-row mx-4 mt-3 rounded-2xl p-1"
-        style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-      >
-        <TouchableOpacity
-          className="flex-1 py-2.5 rounded-xl items-center"
-          style={tab === 'incoming' ? { backgroundColor: '#DC2626' } : undefined}
-          onPress={() => setTab('incoming')}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: tab === 'incoming' }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: '700', color: tab === 'incoming' ? '#fff' : 'rgba(255,255,255,0.4)' }}>
-            Incoming{incoming.length > 0 ? ` (${incoming.length})` : ''}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          className="flex-1 py-2.5 rounded-xl items-center"
-          style={tab === 'outgoing' ? { backgroundColor: '#DC2626' } : undefined}
-          onPress={() => setTab('outgoing')}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: tab === 'outgoing' }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: '700', color: tab === 'outgoing' ? '#fff' : 'rgba(255,255,255,0.4)' }}>
-            Outgoing{outgoing.length > 0 ? ` (${outgoing.length})` : ''}
-          </Text>
-        </TouchableOpacity>
+    <View style={styles.screen}>
+      <View style={{ padding: 24, paddingBottom: 12 }}>
+        <Label style={{ color: color.coral }}>
+          FROM STRANGERS TO SOMETHING MORE
+        </Label>
+        <Title style={{ marginTop: 12 }}>Make it mutual.</Title>
+        <Copy style={{ color: color.muted, marginTop: 10 }}>
+          Accepting shares your Spotify profiles with each other.
+        </Copy>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 20 }}>
+          {(["incoming", "outgoing"] as const).map((t) => (
+            <Pressable
+              key={t}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: t === tab }}
+              onPress={() => setTab(t)}
+              style={{
+                flex: 1,
+                minHeight: 48,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 14,
+                backgroundColor: tab === t ? color.paper : color.surface,
+              }}
+            >
+              <Text
+                style={{
+                  color: tab === t ? color.ink : color.muted,
+                  fontWeight: "700",
+                }}
+              >
+                {t === "incoming" ? "Incoming" : "Outgoing"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {error && (
+          <>
+            <Notice error message={error} />
+            <Button title="Refresh requests" secondary onPress={load} />
+          </>
+        )}
       </View>
-
-      {tab === 'incoming' ? (
-        <FlatList
-          data={incoming}
-          keyExtractor={(item) => item.id}
-          renderItem={renderIncomingItem}
-          ListEmptyComponent={
-            <View className="items-center mt-16">
-              <Text style={{ fontSize: 32 }}>📥</Text>
-              <Text className="text-white/35 mt-3 text-sm">No incoming requests</Text>
+      <FlatList
+        data={tab === "incoming" ? incoming : outgoing}
+        refreshing={loading}
+        onRefresh={load}
+        keyExtractor={(r) => r.id}
+        contentContainerStyle={{
+          padding: 24,
+          paddingTop: 4,
+          paddingBottom: insets.bottom + 24,
+        }}
+        ListEmptyComponent={
+          <EmptyState
+            loading={loading}
+            title={
+              loading
+                ? "Checking your frequency…"
+                : error
+                  ? "Requests unavailable"
+                  : "No requests yet."
+            }
+            body={
+              error
+                ? "Your requests will appear when Wavelength reconnects."
+                : "A shared track can lead somewhere. Start with a listener in Nearby."
+            }
+          />
+        }
+        renderItem={({ item }) => {
+          const status =
+            item.status === "pending" && item.expiresAt <= now
+              ? "expired"
+              : item.status;
+          const minutesLeft = Math.max(
+            0,
+            Math.ceil((item.expiresAt - now) / 60000),
+          );
+          const timeLeft =
+            minutesLeft >= 60
+              ? `${Math.floor(minutesLeft / 60)}h ${minutesLeft % 60}m left`
+              : `${minutesLeft}m left`;
+          return (
+            <View
+              style={{
+                paddingVertical: 20,
+                borderBottomWidth: 1,
+                borderBottomColor: color.line,
+              }}
+            >
+              <View
+                style={{ flexDirection: "row", gap: 12, alignItems: "center" }}
+              >
+                <Avatar id={item.id} size={44} />
+                <View style={{ flex: 1 }}>
+                  <Copy style={{ fontWeight: "600" }}>Anonymous listener</Copy>
+                  <Copy
+                    style={{
+                      fontSize: 12,
+                      color: status === "accepted" ? color.ice : color.muted,
+                    }}
+                  >
+                    {status === "pending"
+                      ? `${tab === "incoming" ? "Wants to connect" : "Waiting for a reply"} · ${timeLeft}`
+                      : status.charAt(0).toUpperCase() + status.slice(1)}
+                  </Copy>
+                </View>
+              </View>
+              {status === "pending" ? (
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                  {tab === "incoming" ? (
+                    <>
+                      <Button
+                        title="Accept & reveal"
+                        busy={busy === item.id}
+                        disabled={!!busy}
+                        onPress={() => act(item, "accept")}
+                        style={{ flex: 1 }}
+                      />
+                      <Button
+                        title="Decline"
+                        secondary
+                        disabled={!!busy}
+                        onPress={() => act(item, "decline")}
+                      />
+                    </>
+                  ) : (
+                    <Button
+                      title="Cancel request"
+                      secondary
+                      busy={busy === item.id}
+                      disabled={!!busy}
+                      onPress={() => act(item, "cancel")}
+                    />
+                  )}
+                </View>
+              ) : (
+                <Copy
+                  style={{ color: color.muted, fontSize: 12, marginTop: 10 }}
+                >
+                  {status === "accepted"
+                    ? "Find your shared profiles in Connections."
+                    : status === "expired"
+                      ? "The time to respond has passed. Your profile remains hidden."
+                      : "This request is closed. Your profile remains hidden."}
+                </Copy>
+              )}
             </View>
-          }
-          contentContainerStyle={{ paddingVertical: 8 }}
-        />
-      ) : (
-        <FlatList
-          data={outgoing}
-          keyExtractor={(item) => item.id}
-          renderItem={renderOutgoingItem}
-          ListEmptyComponent={
-            <View className="items-center mt-16">
-              <Text style={{ fontSize: 32 }}>📤</Text>
-              <Text className="text-white/35 mt-3 text-sm">No outgoing requests</Text>
+          );
+        }}
+      />
+      <Sheet visible={!!revealed} onClose={() => setRevealed(null)}>
+        <Entrance>
+          <View style={{ alignItems: "center", paddingVertical: 20, gap: 22 }}>
+            <View style={{ flexDirection: "row", gap: 16 }}>
+              <Wave size={65} />
+              <Wave size={65} tint={color.ice} />
             </View>
-          }
-          contentContainerStyle={{ paddingVertical: 8 }}
-        />
-      )}
+            <Label style={{ color: color.ice }}>THE FEELING IS MUTUAL</Label>
+            <Title style={{ textAlign: "center" }}>
+              {"You found your\nwavelength."}
+            </Title>
+            <Copy style={{ color: color.muted, textAlign: "center" }}>
+              Your Spotify profiles are now visible to each other.
+            </Copy>
+            <Button
+              title="Meet your connection"
+              onPress={() => {
+                const id = revealed;
+                setRevealed(null);
+                if (id)
+                  router.push({
+                    pathname: "/connection-detail",
+                    params: { connectionId: id },
+                  });
+              }}
+            />
+          </View>
+        </Entrance>
+      </Sheet>
     </View>
   );
 }

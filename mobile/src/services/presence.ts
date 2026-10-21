@@ -7,8 +7,12 @@
  * caller's current anonymous id, cached here for "is this me" checks.
  */
 
-import { AppState, AppStateStatus, NativeEventSubscription } from 'react-native';
-import { sendPresence } from './api';
+import {
+  AppState,
+  AppStateStatus,
+  NativeEventSubscription,
+} from "react-native";
+import { sendPresence } from "./api";
 
 const HEARTBEAT_INTERVAL = 60_000;
 
@@ -40,14 +44,14 @@ function stopTimer(): void {
 }
 
 function onAppStateChange(state: AppStateStatus): void {
-  if (state === 'active') startTimer();
+  if (state === "active") startTimer();
   else stopTimer();
 }
 
 export function startPresence(): void {
   if (appStateSub) return;
-  appStateSub = AppState.addEventListener('change', onAppStateChange);
-  if (AppState.currentState === 'active') startTimer();
+  appStateSub = AppState.addEventListener("change", onAppStateChange);
+  if (AppState.currentState === "active") startTimer();
 }
 
 export function stopPresence(): void {
@@ -59,4 +63,10 @@ export function stopPresence(): void {
 /** The caller's current anonymous id, pinging the server if none is cached yet. */
 export async function getMyAnonId(): Promise<string | null> {
   return myAnonId ?? ping();
+}
+
+/** Clear session identity when the account changes, not when a screen blurs. */
+export function resetPresence(): void {
+  stopPresence();
+  myAnonId = null;
 }

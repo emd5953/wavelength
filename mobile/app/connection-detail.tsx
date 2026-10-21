@@ -1,27 +1,18 @@
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SpotifyAuthModule } from '../src/services/spotifyAuth';
-import ConnectionDetailScreen from '../src/components/ConnectionDetailScreen';
-
+import { useLocalSearchParams, useRouter } from "expo-router";
+import ConnectionDetailScreen from "../src/components/ConnectionDetailScreen";
+import { EmptyState } from "../src/design/ui";
 export default function ConnectionDetailRoute() {
   const router = useRouter();
   const { connectionId } = useLocalSearchParams<{ connectionId: string }>();
-  const [userId, setUserId] = useState('');
-
-  useEffect(() => {
-    SpotifyAuthModule.getStoredTokens().then((tokens) => {
-      if (tokens) setUserId(tokens.accessToken);
-    });
-  }, []);
-
-  if (!connectionId || !userId) return null;
-
-  return (
+  return connectionId ? (
     <ConnectionDetailScreen
       connectionId={connectionId}
-      userId={userId}
-      onBack={() => router.back()}
-      onRemoved={() => router.replace('/connections')}
+      onRemoved={() => router.replace("/connections")}
+    />
+  ) : (
+    <EmptyState
+      title="Choose a connection"
+      body="Your mutual connections are waiting in Connections."
     />
   );
 }
