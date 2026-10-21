@@ -1,14 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image } from 'react-native';
 import { getConnections } from '../services/api';
 import type { ConnectionListItem } from '../services/api';
+import { Screen, Card, EmptyState, Spinner } from './ui';
 
 interface ConnectionsListScreenProps {
   userId: string;
@@ -40,54 +34,44 @@ export default function ConnectionsListScreen({
 
   const renderItem = ({ item }: { item: ConnectionListItem }) => (
     <TouchableOpacity
-      className="flex-row items-center p-4 mx-4 my-1.5 rounded-2xl"
-      style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
       onPress={() => onSelectConnection(item.id)}
       accessibilityLabel={`View profile of ${item.displayName}`}
       accessibilityRole="button"
     >
-      <Image
-        source={{ uri: item.profileImageUrl }}
-        className="w-12 h-12 rounded-full"
-        style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 2, borderColor: '#DC2626' }}
-        accessibilityLabel={`${item.displayName} profile image`}
-      />
-      <View className="ml-3.5 flex-1">
-        <Text className="text-base font-bold text-white">{item.displayName}</Text>
-        <Text className="text-xs text-white/35 mt-0.5">
-          Connected {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
-      </View>
-      <Text className="text-white/30 text-lg">›</Text>
+      <Card className="flex-row items-center p-4 mx-4 my-1.5">
+        <Image
+          source={{ uri: item.profileImageUrl }}
+          className="w-11 h-11 rounded-full bg-card"
+          accessibilityLabel={`${item.displayName} profile image`}
+        />
+        <View className="ml-3.5 flex-1">
+          <Text className="font-mono-medium text-[15px] text-ink" numberOfLines={1}>{item.displayName}</Text>
+          <Text className="font-mono text-xs text-ink-dim mt-0.5">
+            connected {new Date(item.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+        <Text className="font-mono text-ink-dim">→</Text>
+      </Card>
     </TouchableOpacity>
   );
 
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center" style={{ backgroundColor: '#1a0a0a' }}>
-        <ActivityIndicator size="large" color="#DC2626" />
-      </View>
-    );
-  }
+  if (loading) return <Spinner />;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
+    <Screen>
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={
-          <View className="items-center mt-16">
-            <Text style={{ fontSize: 32 }}>🤝</Text>
-            <Text className="text-white/35 mt-3 text-sm">No connections yet</Text>
-            <Text className="text-white/25 text-xs mt-1 text-center px-8">
-              Send connection requests through DMs to reveal Spotify profiles
-            </Text>
-          </View>
+          <EmptyState
+            title="no one yet."
+            body="when you and someone nearby both choose to connect, they'll show up here with their spotify profile."
+          />
         }
         contentContainerStyle={{ paddingVertical: 8 }}
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </Screen>
   );
 }

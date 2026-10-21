@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, SectionList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { GPSModule } from '../src/services/gps';
@@ -11,12 +10,13 @@ import { startPresence, stopPresence } from '../src/services/presence';
 import { startBackgroundLocation } from '../src/services/backgroundLocation';
 import { registerForPushNotifications } from '../src/services/pushNotifications';
 import BroadcastCard from '../src/components/BroadcastCard';
+import FeedHeader, { ViewMode } from '../src/components/FeedHeader';
+import { SectionLabel, COLORS } from '../src/components/ui';
 import FeedMap from '../src/components/FeedMap';
 import * as SecureStore from 'expo-secure-store';
 import { RADIUS_KEY } from './profile';
 
 const POLL_INTERVAL = 10_000;
-type ViewMode = 'list' | 'map';
 
 /** Live plays first, then most recently started. Mirrors the server's order. */
 function sortFeed(items: FeedBroadcast[]): FeedBroadcast[] {
@@ -95,96 +95,41 @@ export default function NearbyFeedScreen() {
     };
   }, [loadFeed]);
 
-  const liveCount = broadcasts.filter((b) => b.isLive).length;
+  const live = broadcasts.filter((b) => b.isLive);
+  const earlier = broadcasts.filter((b) => !b.isLive);
 
   const header = (
-    <LinearGradient colors={['#DC2626', '#B91C1C', '#1a0a0a']} locations={[0, 0.5, 1]}>
-      <View style={{ paddingTop: insets.top + 8 }} className="px-5 pb-5">
-        {/* Top row */}
-        <View className="flex-row items-center justify-between mb-4">
-          <View>
-            <Text className="text-3xl font-extrabold text-white tracking-tight">Nearby</Text>
-            <Text className="text-xs text-white/50 mt-1">
-              {liveCount} playing now · {broadcasts.length - liveCount} recently
-            </Text>
-          </View>
-          <View className="flex-row gap-2">
-            <TouchableOpacity
-              className="w-11 h-11 rounded-2xl items-center justify-center"
-              style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-              onPress={() => router.push('/connections')}
-              accessibilityLabel="Connections"
-              accessibilityRole="button"
-            >
-              <Text style={{ fontSize: 17 }}>🤝</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="w-11 h-11 rounded-2xl items-center justify-center"
-              style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-              onPress={() => router.push('/profile')}
-              accessibilityLabel="Profile"
-              accessibilityRole="button"
-            >
-              <Text style={{ fontSize: 17 }}>👤</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* View toggle — frosted glass pill */}
-        <View
-          className="flex-row rounded-2xl p-1"
-          style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
-        >
-          <TouchableOpacity
-            className={`flex-1 py-2.5 rounded-xl items-center ${viewMode === 'list' ? '' : ''}`}
-            style={viewMode === 'list' ? { backgroundColor: '#fff' } : undefined}
-            onPress={() => setViewMode('list')}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: viewMode === 'list' }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: viewMode === 'list' ? '#DC2626' : 'rgba(255,255,255,0.6)' }}>
-              List
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`flex-1 py-2.5 rounded-xl items-center`}
-            style={viewMode === 'map' ? { backgroundColor: '#fff' } : undefined}
-            onPress={() => setViewMode('map')}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: viewMode === 'map' }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: viewMode === 'map' ? '#DC2626' : 'rgba(255,255,255,0.6)' }}>
-              Map
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </LinearGradient>
+    <FeedHeader
+      topInset={insets.top}
+      artUrl={live[0]?.albumArtUrl || null}
+      liveCount={live.length}
+      earlierCount={earlier.length}
+      viewMode={viewMode}
+      onChangeViewMode={setViewMode}
+      onOpenPeople={() => router.push('/connections')}
+      onOpenProfile={() => router.push('/profile')}
+    />
   );
 
   if (loading) {
     return (
-      <LinearGradient colors={['#DC2626', '#991B1B', '#1a0a0a']} className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#fff" />
-        <Text className="text-sm text-white/50 mt-4">Finding listeners nearby...</Text>
-      </LinearGradient>
+      <View className="flex-1 justify-center items-center bg-ground">
+        <ActivityIndicator color={COLORS.inkDim} />
+        <Text className="font-mono text-[13px] text-ink-dim mt-4">listening around you…</Text>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <View className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
+      <View className="flex-1 bg-ground">
         {header}
-        <View className="flex-1 justify-center items-center px-8">
-          <Text style={{ fontSize: 48 }}>📡</Text>
-          <Text className="text-base text-white/60 text-center mt-4">{error}</Text>
-          <TouchableOpacity
-            className="mt-5 px-6 py-3 rounded-2xl"
-            style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
-            onPress={loadFeed}
-            accessibilityRole="button"
-          >
-            <Text className="text-sm text-white font-bold">Try Again</Text>
+        <View className="flex-1 justify-center items-center px-10">
+          <Text className="font-mono text-[15px] text-ink-muted text-center leading-6">
+            couldn't load what's playing nearby.
+          </Text>
+          <TouchableOpacity className="mt-5" onPress={loadFeed} accessibilityRole="button" hitSlop={10}>
+            <Text className="font-mono-medium text-[13px] text-ink">try again</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -193,28 +138,35 @@ export default function NearbyFeedScreen() {
 
   if (broadcasts.length === 0) {
     return (
-      <View className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
+      <View className="flex-1 bg-ground">
         {header}
-        <View className="flex-1 justify-center items-center px-8">
-          <Text style={{ fontSize: 48 }}>🔇</Text>
-          <Text className="text-lg font-bold text-white text-center mt-4">Nothing played nearby yet</Text>
-          <Text className="text-sm text-white/50 text-center mt-2 leading-5">
-            Songs played around you in the last 6 hours show up here, and what's playing right now goes on top.
+        <View className="flex-1 justify-center px-10">
+          <Text className="font-mono-light text-xl text-ink">nothing played nearby yet.</Text>
+          <Text className="font-mono text-[13px] text-ink-muted mt-3 leading-6">
+            songs played around you in the last 6 hours show up here. what's playing right now goes on top.
           </Text>
         </View>
       </View>
     );
   }
 
+  const sections = [
+    { title: 'PLAYING NOW', data: live },
+    { title: 'EARLIER', data: earlier },
+  ].filter((section) => section.data.length > 0);
+
   return (
-    <View className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
+    <View className="flex-1 bg-ground">
       {header}
       {viewMode === 'map' ? (
         <FeedMap broadcasts={broadcasts} userLocation={userLocation} />
       ) : (
-        <FlatList
-          data={broadcasts}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => item.id}
+          renderSectionHeader={({ section }) => (
+            <SectionLabel title={section.title} className="px-6 pt-5 pb-2 bg-ground" />
+          )}
           renderItem={({ item }) => (
             <BroadcastCard
               broadcast={item}
@@ -222,7 +174,8 @@ export default function NearbyFeedScreen() {
               onOpenDM={(anonId) => router.push(`/dm?recipientAnonId=${anonId}`)}
             />
           )}
-          contentContainerStyle={{ paddingVertical: 8, paddingBottom: insets.bottom + 8 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+          stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
         />
       )}

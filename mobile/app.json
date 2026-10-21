@@ -12,7 +12,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Wavelength to use your location to find nearby listeners."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "bundleIdentifier": "com.anonymous.wavelength"

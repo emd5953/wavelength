@@ -12,12 +12,10 @@ const REACTIONS = [
 ] as const;
 
 function formatTimeSince(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+  return `${Math.floor(minutes / 60)}h ago`;
 }
 
 interface BroadcastCardProps {
@@ -42,82 +40,59 @@ export default function BroadcastCard({
     }
   };
 
+  const when = broadcast.isLive
+    ? 'playing now'
+    : formatTimeSince(Date.now() - (broadcast.endedAt ?? broadcast.startedAt));
+  const match = broadcast.tasteScore != null && broadcast.tasteScore > 0
+    ? ` · ${broadcast.tasteScore}% match`
+    : '';
+
   return (
     <View
-      className="mx-4 my-1.5 rounded-2xl overflow-hidden"
-      style={{
-        backgroundColor: 'rgba(255,255,255,0.07)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-      }}
+      className="mx-4 my-1.5 rounded-[14px] overflow-hidden bg-card border border-rule"
       accessibilityRole="summary"
     >
       <View className="p-4">
         <View className="flex-row">
           <Image
             source={{ uri: broadcast.albumArtUrl }}
-            className="w-16 h-16 rounded-xl"
-            style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+            className="w-14 h-14 rounded-lg bg-card"
             accessibilityLabel={`Album art for ${broadcast.trackTitle}`}
           />
           <View className="flex-1 ml-3.5 justify-center">
-            <Text className="text-base font-bold text-white" numberOfLines={1}>
+            <Text className="font-mono-medium text-[15px] text-ink" numberOfLines={1}>
               {broadcast.trackTitle}
             </Text>
-            <Text className="text-sm text-white/60 mt-0.5" numberOfLines={1}>
+            <Text className="font-mono text-[13px] text-ink-muted mt-0.5" numberOfLines={1}>
               {broadcast.artistName}
             </Text>
-            <View className="flex-row items-center mt-1.5 gap-2">
-              {broadcast.isLive ? (
-                <View
-                  className="flex-row items-center gap-1 px-2 py-0.5 rounded-lg"
-                  style={{ backgroundColor: '#DC2626' }}
-                  accessibilityLabel="Playing now"
-                >
-                  <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#fff' }} />
-                  <Text style={{ fontSize: 10, color: '#fff', fontWeight: '800' }}>LIVE</Text>
-                </View>
-              ) : (
-                <Text className="text-xs text-white/35">
-                  played {formatTimeSince(Date.now() - (broadcast.endedAt ?? broadcast.startedAt))}
-                </Text>
-              )}
-              {broadcast.tasteScore != null && broadcast.tasteScore > 0 && (
-                <View
-                  className="px-2 py-0.5 rounded-lg"
-                  style={{ backgroundColor: 'rgba(220,38,38,0.2)', borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)' }}
-                >
-                  <Text style={{ fontSize: 10, color: '#EF4444', fontWeight: '700' }}>
-                    {broadcast.tasteScore}% match
-                  </Text>
-                </View>
-              )}
+            <View
+              className="flex-row items-center mt-1.5"
+              accessibilityLabel={broadcast.isLive ? 'Playing now' : `Played ${when}`}
+            >
+              {broadcast.isLive && <View className="w-1.5 h-1.5 rounded-full bg-live mr-1.5" />}
+              <Text className="font-mono text-xs text-ink-dim">
+                {when}{match}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Reactions */}
-        <View className="flex-row mt-3 gap-1.5">
+        {/* Reactions — the one place emoji stay, because they are the content */}
+        <View className="flex-row mt-3.5 gap-1">
           {REACTIONS.map((r) => {
             const count = counts[r.type];
             const hasCount = count != null && count > 0;
             return (
               <TouchableOpacity
                 key={r.type}
-                className="flex-row items-center px-2.5 py-1.5 rounded-xl"
-                style={{
-                  backgroundColor: hasCount ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.06)',
-                  borderWidth: hasCount ? 1 : 0,
-                  borderColor: 'rgba(220,38,38,0.25)',
-                }}
+                className={`flex-row items-center px-2 py-1 rounded-full ${hasCount ? 'bg-card border border-rule' : ''}`}
                 onPress={() => handleReaction(r.type)}
                 accessibilityLabel={`React with ${r.type}`}
                 accessibilityRole="button"
               >
-                <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
-                {hasCount && (
-                  <Text className="text-xs text-white/60 ml-1">{count}</Text>
-                )}
+                <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
+                {hasCount && <Text className="font-mono text-[11px] text-ink-dim ml-1">{count}</Text>}
               </TouchableOpacity>
             );
           })}
@@ -125,28 +100,26 @@ export default function BroadcastCard({
       </View>
 
       {/* Action bar */}
-      <View className="flex-row" style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+      <View className="flex-row border-t border-rule">
         {onOpenComments && (
           <TouchableOpacity
-            className="flex-1 py-3 items-center flex-row justify-center gap-1.5"
-            style={{ borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.06)' }}
+            className="flex-1 py-3 items-center"
             onPress={() => onOpenComments(broadcast.id)}
             accessibilityLabel="View comments"
             accessibilityRole="button"
           >
-            <Text style={{ fontSize: 13 }}>💬</Text>
-            <Text className="text-xs text-white/50 font-medium">Comments</Text>
+            <Text className="font-mono text-xs text-ink-muted">comment</Text>
           </TouchableOpacity>
         )}
+        {onOpenComments && onOpenDM && <View className="w-px bg-rule" />}
         {onOpenDM && (
           <TouchableOpacity
-            className="flex-1 py-3 items-center flex-row justify-center gap-1.5"
+            className="flex-1 py-3 items-center"
             onPress={() => onOpenDM(broadcast.anonymousId)}
             accessibilityLabel="Send direct message"
             accessibilityRole="button"
           >
-            <Text style={{ fontSize: 13 }}>✉️</Text>
-            <Text className="text-xs text-white/50 font-medium">Message</Text>
+            <Text className="font-mono text-xs text-ink-muted">message</Text>
           </TouchableOpacity>
         )}
       </View>

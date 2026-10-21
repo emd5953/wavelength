@@ -5,39 +5,24 @@ module.exports = {
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
+      fontFamily: {
+        'mono-light': ['PaperMono-Light'],
+        mono: ['PaperMono-Regular'],
+        'mono-medium': ['PaperMono-Medium'],
+        'mono-semibold': ['PaperMono-SemiBold'],
+      },
       colors: {
-        // Air Max 97 red/white palette
-        surface: '#1a0a0a',
-        'surface-elevated': '#2a1215',
-        'surface-card': 'rgba(255, 255, 255, 0.08)',
-        'surface-card-solid': '#2d1418',
-        'surface-glass': 'rgba(255, 255, 255, 0.12)',
-        'surface-glass-heavy': 'rgba(255, 255, 255, 0.18)',
-
-        // Reds
-        'am-red': '#DC2626',
-        'am-red-light': '#EF4444',
-        'am-red-dark': '#991B1B',
-        'am-crimson': '#B91C1C',
-        'am-rose': '#F43F5E',
-
-        // Whites
-        'am-white': '#FFFFFF',
-        'am-white-soft': 'rgba(255, 255, 255, 0.9)',
-        'am-white-muted': 'rgba(255, 255, 255, 0.6)',
-        'am-white-dim': 'rgba(255, 255, 255, 0.35)',
-
-        // Accents
-        spotify: '#1DB954',
-        'spotify-dim': '#17a348',
-        accent: '#DC2626',
-        muted: 'rgba(255, 255, 255, 0.6)',
-        'muted-light': 'rgba(255, 255, 255, 0.8)',
-        'muted-dark': 'rgba(255, 255, 255, 0.35)',
-        'muted-border': 'rgba(255, 255, 255, 0.1)',
-        danger: '#ef4444',
-        'danger-light': '#f87171',
-        'chat-mine': 'rgba(220, 38, 38, 0.2)',
+        // Sky palette — see docs/design/222-reference.md
+        night: '#051F33',
+        ground: '#082F49',
+        'ground-lift': '#0C4A6E',
+        card: 'rgba(240, 249, 255, 0.06)',
+        rule: 'rgba(240, 249, 255, 0.15)',
+        primary: '#075985',
+        ink: '#F0F9FF',
+        'ink-muted': 'rgba(224, 242, 254, 0.65)',
+        'ink-dim': 'rgba(186, 230, 253, 0.45)',
+        live: '#38BDF8',
       },
     },
   },

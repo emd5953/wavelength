@@ -1,17 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Linking,
-  Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, Image, ScrollView, Linking, Alert } from 'react-native';
 import { getConnectionDetail, removeConnection } from '../services/api';
 import type { ConnectionDetailData } from '../services/api';
+import { Screen, SectionLabel, EmptyState, PrimaryButton, TextButton, Spinner } from './ui';
 
 interface ConnectionDetailScreenProps {
   connectionId: string;
@@ -48,8 +39,8 @@ export default function ConnectionDetailScreen({
 
   const handleRemove = () => {
     Alert.alert(
-      'Remove Connection',
-      'This will remove the connection for both users. Future interactions will be anonymous.',
+      'Remove connection?',
+      'This removes the connection for both of you. Anything after this is anonymous again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -77,129 +68,66 @@ export default function ConnectionDetailScreen({
     }
   };
 
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center" style={{ backgroundColor: '#1a0a0a' }}>
-        <ActivityIndicator size="large" color="#DC2626" />
-      </View>
-    );
-  }
+  if (loading) return <Spinner />;
 
   if (!detail) {
     return (
-      <View className="flex-1 justify-center items-center px-8" style={{ backgroundColor: '#1a0a0a' }}>
-        <Text style={{ fontSize: 32 }}>🔍</Text>
-        <Text className="text-base text-white/35 mt-3 mb-4">Connection not found</Text>
-        <TouchableOpacity
-          onPress={onBack}
-          className="px-6 py-3 rounded-2xl"
-          style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
-          accessibilityRole="button"
-        >
-          <Text style={{ color: '#DC2626', fontSize: 14, fontWeight: '700' }}>Go back</Text>
-        </TouchableOpacity>
-      </View>
+      <Screen>
+        <EmptyState title="connection not found." body="they may have removed it.">
+          <TextButton label="← go back" onPress={onBack} className="mt-6" />
+        </EmptyState>
+      </Screen>
     );
   }
 
   const { profile } = detail;
 
-  return (
-    <ScrollView className="flex-1" style={{ backgroundColor: '#1a0a0a' }}>
-      <TouchableOpacity
-        onPress={onBack}
-        className="px-5 pt-4 pb-2"
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-      >
-        <Text className="text-sm text-white/60 font-semibold">← Back</Text>
-      </TouchableOpacity>
-
-      {/* Profile header */}
-      <View className="items-center py-6">
-        <Image
-          source={{ uri: profile.profileImageUrl }}
-          className="w-28 h-28 rounded-full"
-          style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 3, borderColor: '#DC2626' }}
-          accessibilityLabel={`${profile.displayName} profile image`}
-        />
-        <Text className="text-2xl font-extrabold text-white mt-4">{profile.displayName}</Text>
-        <TouchableOpacity
-          onPress={handleOpenSpotify}
-          className="mt-4 px-6 py-3 rounded-2xl"
-          style={{
-            backgroundColor: '#fff',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-          }}
-          accessibilityRole="link"
-          accessibilityLabel="Open Spotify profile"
-        >
-          <Text style={{ color: '#DC2626', fontWeight: '800', fontSize: 14 }}>Open on Spotify</Text>
-        </TouchableOpacity>
+  const list = (title: string, items: string[]) =>
+    items.length > 0 && (
+      <View className="mt-10">
+        <SectionLabel title={title} className="mb-2" />
+        {items.map((item, i) => (
+          <View key={i} className={`flex-row py-3 ${i < items.length - 1 ? 'border-b border-rule' : ''}`}>
+            <Text className="font-mono text-[13px] text-ink-dim w-8">{String(i + 1).padStart(2, '0')}</Text>
+            <Text className="font-mono text-[14px] text-ink flex-1" numberOfLines={1}>{item}</Text>
+          </View>
+        ))}
       </View>
+    );
 
-      {/* Top Artists */}
-      {profile.topArtists.length > 0 && (
-        <View
-          className="mx-5 mt-4 rounded-2xl p-5"
-          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-        >
-          <Text className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">
-            Top Artists
+  return (
+    <Screen>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}>
+        <View className="items-center pt-8">
+          <Image
+            source={{ uri: profile.profileImageUrl }}
+            className="w-24 h-24 rounded-full bg-card border border-rule"
+            accessibilityLabel={`${profile.displayName} profile image`}
+          />
+          <Text className="font-mono text-[13px] text-ink-dim mt-6">you're connected with</Text>
+          <Text className="font-mono-light text-[30px] text-ink mt-1 text-center">
+            {profile.displayName.toLowerCase()}
           </Text>
-          {profile.topArtists.map((artist, i) => (
-            <View
-              key={i}
-              className="flex-row items-center py-2.5"
-              style={i < profile.topArtists.length - 1 ? { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' } : undefined}
-            >
-              <Text className="text-xs text-white/30 w-6">{i + 1}</Text>
-              <Text className="text-sm text-white/80 flex-1">{artist}</Text>
-            </View>
-          ))}
         </View>
-      )}
 
-      {/* Top Tracks */}
-      {profile.topTracks.length > 0 && (
-        <View
-          className="mx-5 mt-4 rounded-2xl p-5"
-          style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
-        >
-          <Text className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">
-            Top Tracks
-          </Text>
-          {profile.topTracks.map((track, i) => (
-            <View
-              key={i}
-              className="flex-row items-center py-2.5"
-              style={i < profile.topTracks.length - 1 ? { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' } : undefined}
-            >
-              <Text className="text-xs text-white/30 w-6">{i + 1}</Text>
-              <Text className="text-sm text-white/80 flex-1">{track}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+        <PrimaryButton
+          label="open on spotify"
+          onPress={handleOpenSpotify}
+          accessibilityLabel="Open Spotify profile"
+          className="mt-8"
+        />
 
-      {/* Remove */}
-      <TouchableOpacity
-        className="mx-5 my-6 py-4 rounded-2xl items-center"
-        style={{ borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)' }}
-        onPress={handleRemove}
-        disabled={removing}
-        accessibilityRole="button"
-        accessibilityLabel="Remove connection"
-      >
-        {removing ? (
-          <ActivityIndicator size="small" color="#ef4444" />
-        ) : (
-          <Text style={{ color: '#EF4444', fontWeight: '600', fontSize: 14 }}>Remove Connection</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+        {list('TOP ARTISTS', profile.topArtists)}
+        {list('TOP TRACKS', profile.topTracks)}
+
+        <TextButton
+          label={removing ? 'removing…' : 'remove connection'}
+          onPress={handleRemove}
+          disabled={removing}
+          accessibilityLabel="Remove connection"
+          className="items-center mt-12 py-3"
+        />
+      </ScrollView>
+    </Screen>
   );
 }

@@ -1,7 +1,10 @@
-import { Text, View, TouchableOpacity, Linking, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Text, View, Linking, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, PrimaryButton } from '../src/components/ui';
 
 export default function LocationRequiredScreen() {
+  const insets = useSafeAreaInsets();
+
   const openSettings = () => {
     if (Platform.OS === 'ios') {
       Linking.openURL('app-settings:');
@@ -11,35 +14,14 @@ export default function LocationRequiredScreen() {
   };
 
   return (
-    <LinearGradient colors={['#DC2626', '#B91C1C', '#1a0a0a']} locations={[0, 0.4, 1]} className="flex-1 justify-center items-center px-8">
-      <View
-        className="w-20 h-20 rounded-2xl items-center justify-center mb-6"
-        style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-      >
-        <Text style={{ fontSize: 38 }}>📍</Text>
+    <Screen className="px-8" style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
+      <View className="flex-1 justify-center">
+        <Text className="font-mono-light text-[32px] text-ink leading-[42px]">wavelength needs{'\n'}your location.</Text>
+        <Text className="font-mono text-[14px] text-ink-muted mt-6 leading-7">
+          it's how we find what's playing around you, and how people nearby see where you're listening on the map.
+        </Text>
       </View>
-
-      <Text className="text-2xl font-extrabold text-white text-center mb-3">
-        Location Access Required
-      </Text>
-      <Text className="text-base text-white/60 text-center leading-6 mb-8">
-        Wavelength needs your location to discover what people near you are listening to. Your exact location is never shared with other users.
-      </Text>
-
-      <TouchableOpacity
-        className="w-full py-4 rounded-2xl items-center"
-        style={{
-          backgroundColor: '#fff',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.3,
-          shadowRadius: 16,
-        }}
-        onPress={openSettings}
-        accessibilityRole="button"
-      >
-        <Text style={{ color: '#DC2626', fontSize: 16, fontWeight: '800' }}>Open Settings</Text>
-      </TouchableOpacity>
-    </LinearGradient>
+      <PrimaryButton label="open settings" onPress={openSettings} />
+    </Screen>
   );
 }
