@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, FlatList, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { getDMThread, sendDM } from '../services/api';
-import type { DMMessage } from '../services/api';
+import type { DMMessage, ConnectionRequestOutcome } from '../services/api';
 import { Bubble, BubbleText, Composer } from './Conversation';
 import { EmptyState, COLORS } from './ui';
 
@@ -11,6 +11,8 @@ interface DMScreenProps {
 
 export default function DMScreen({ recipientAnonId }: DMScreenProps) {
   const [messages, setMessages] = useState<DMMessage[]>([]);
+  // Outcome of "ask to connect" for messages sent this visit; reloaded threads only have the flag
+  const [requestOutcomes, setRequestOutcomes] = useState<Record<string, ConnectionRequestOutcome>>({});
   const [text, setText] = useState('');
   const [includeConnectionReq, setIncludeConnectionReq] = useState(false);
   const [sending, setSending] = useState(false);
@@ -27,6 +29,8 @@ export default function DMScreen({ recipientAnonId }: DMScreenProps) {
     try {
       const res = await sendDM(recipientAnonId, text.trim(), includeConnectionReq);
       setMessages((prev) => [...prev, res.dm]);
+      const outcome = res.connectionRequest;
+      if (outcome) setRequestOutcomes((prev) => ({ ...prev, [res.dm.id]: outcome }));
       setText('');
       setIncludeConnectionReq(false);
     } catch {
@@ -51,7 +55,7 @@ export default function DMScreen({ recipientAnonId }: DMScreenProps) {
             <BubbleText text={item.text} />
             {item.includesConnectionRequest && (
               <Text className="font-mono text-[11px] text-ink-muted mt-2 pt-2 border-t border-rule">
-                + asked to connect
+                {requestOutcomes[item.id] === 'already_pending' ? '+ already asked' : '+ asked to connect'}
               </Text>
             )}
           </Bubble>

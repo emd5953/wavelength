@@ -130,11 +130,14 @@ export async function getComments(broadcastId: string): Promise<{ comments: Comm
   return res.json();
 }
 
+/** With includesConnectionRequest the server also asks to connect, and reports the outcome. */
+export type ConnectionRequestOutcome = 'sent' | 'already_pending';
+
 export async function sendDM(
   recipientAnonId: string,
   text: string,
   includesConnectionRequest: boolean = false,
-): Promise<{ dm: DMMessage }> {
+): Promise<{ dm: DMMessage; connectionRequest?: ConnectionRequestOutcome }> {
   const res = await authFetch(`${API_BASE}/social/dms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -168,18 +171,6 @@ export interface ConnectionData {
   userAId: string;
   userBId: string;
   createdAt: number;
-}
-
-export async function sendConnectionRequest(
-  broadcasterAnonId: string,
-): Promise<{ request: ConnectionRequestData }> {
-  const res = await authFetch(`${API_BASE}/connections/requests`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ broadcasterAnonId }),
-  });
-  if (!res.ok) throw new Error(`Send connection request failed: ${res.status}`);
-  return res.json();
 }
 
 export async function acceptConnectionRequest(

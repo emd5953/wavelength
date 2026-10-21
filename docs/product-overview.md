@@ -68,7 +68,7 @@ Discover a song  ◀──  Browse feed / map of what's playing within ~100–50
 | Taste-match % | ✅ Built | Overlap of top 20 artists and top 20 tracks, 0–100 |
 | On-repeat push | ✅ Built | Nearby play of your short-term top track; once per person per song (PR #4) |
 | Reactions / comments / DMs | ✅ Built | Last as long as the play (6h); DMs follow the session |
-| Connection requests | ⚠️ Server only | API works and is tested, but the app has no way to send one or reach the requests screen |
+| Connection requests | ✅ Built | Ask to connect from a DM; incoming requests appear on `people` |
 | Revealed Spotify profile | ⚠️ Placeholder | Real fetcher exists but isn't wired in |
 | Account deletion | ✅ Built | Deletes everything, including DMs from past sessions; fixed in PR #4 |
 | Visual design | ✅ Built | Sky palette + Paper Mono on every screen (`docs/design/222-reference.md`) |
@@ -152,24 +152,22 @@ because it also runs while the app is closed.
 
 Ranked by how much each one undermines the core experience.
 
-1. **The app can't send a connection request.** The "ask to connect" toggle in
-   DMs only flags the message; it never calls `POST /connections/requests`, and
-   nothing links to the requests screen. Connecting is the payoff of the app,
-   so this blocks the core loop.
-2. **The revealed profile is a placeholder.** `connectionService.ts` has its own
+1. **The revealed profile is a placeholder.** `connectionService.ts` has its own
    stand-in that returns a placeholder image and no top artists or tracks.
    `spotifyProfileFetcher.ts` has the real version, but nothing uses it.
-3. **Not tested end to end.** Nobody has run two real devices against a running
+2. **Not tested end to end.** Nobody has run two real devices against a running
    backend.
-4. **The feed can strand you on the location screen.** Its 10s refresh
+3. **The feed can strand you on the location screen.** Its 10s refresh
    re-checks location permission, and if that runs while the app is
    backgrounded it replaces the stack with `/location-required`.
-5. **The poller doesn't scale.** It queries every user every 15s, which runs into
+4. **The poller doesn't scale.** It queries every user every 15s, which runs into
    Spotify rate limits well before it reaches App Store scale.
 
 Fixed in PR #4 (2026-10-21): comments and reactions being wiped every 15s, no
 "recently played", DM threads breaking on every track change, Spotify access
 tokens stored as anonymous IDs, and `DELETE /account/:id` deleting any account.
+Fixed 2026-10-21: the app had no way to send a connection request
+(`docs/specs/send-connection-requests.md`).
 
 ## Launch risks
 
@@ -189,9 +187,8 @@ tokens stored as anonymous IDs, and `DELETE /account/:id` deleting any account.
 Rough phases.
 
 1. **Make the core loop hold together.** ~~Listening sessions, 6h "recently
-   played", on-repeat push~~ (done, PR #4), ~~redesign~~ (done). Next: wire up
-   sending connection requests, the real revealed profile (known gaps 1–2),
-   then the two-device test.
+   played", on-repeat push~~ (done, PR #4), ~~redesign~~ (done). ~~Sending connection requests~~ (done). Next: the real revealed profile
+   (known gap 1), then the two-device test.
 2. **Private beta.** Deploy the backend, ship on TestFlight, seed one location
    with friends.
 3. **Launch readiness.** Resolve Spotify quota, add report and block, handle

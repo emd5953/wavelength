@@ -43,7 +43,17 @@ vi.mock('../services/sessionService', () => ({
   resolveAnonId: (...a: any[]) => session.resolveAnonId(...a),
 }));
 
+const mockSendRequest = vi.fn();
+vi.mock('../services/connectionService', () => {
+  class RequestStateError extends Error {}
+  return {
+    sendRequest: (...a: any[]) => mockSendRequest(...a),
+    RequestStateError,
+  };
+});
+
 const USER_ID = '11111111-1111-4111-8111-111111111111';
+const RECIPIENT_ID = '22222222-2222-4222-8222-222222222222';
 const MY_ANON = 'anon-me';
 const TOKEN = 'user-access-token';
 const VALID_REACTIONS = ['fire', 'heart', 'headphones', 'clap', 'surprised'];
@@ -66,7 +76,9 @@ beforeEach(() => {
   session.getOrCreateOpenSession.mockReset();
   session.getOrCreateOpenSession.mockResolvedValue({ id: 'session-1', anonymousId: MY_ANON });
   session.resolveAnonId.mockReset();
-  session.resolveAnonId.mockResolvedValue('22222222-2222-4222-8222-222222222222');
+  session.resolveAnonId.mockResolvedValue(RECIPIENT_ID);
+  mockSendRequest.mockReset();
+  mockSendRequest.mockResolvedValue({ id: 'req-1', status: 'pending', expiresAt: Date.now() });
 });
 
 // ============================================================
@@ -286,17 +298,78 @@ describe('DMs', () => {
     expect(svc.sendDM).toHaveBeenCalledWith(MY_ANON, 'anon-b', 'hey', false);
   });
 
-  it('forwards a truthy connection-request flag as a boolean', async () => {
+  it('does not create a connection request without the flag', async () => {
     const app = await buildApp();
     svc.sendDM.mockResolvedValue({ id: 'dm1' });
 
-    await auth(request(app).post('/social/dms')).send({
+    const res = await auth(request(app).post('/social/dms')).send({ recipientAnonId: 'anon-b', text: 'hey' });
+
+    expect(mockSendRequest).not.toHaveBeenCalled();
+    expect(res.body.connectionRequest).toBeUndefined();
+  });
+
+  it('asks to connect: creates the request, flags the DM, and reports sent', async () => {
+    const app = await buildApp();
+    svc.sendDM.mockResolvedValue({ id: 'dm1' });
+
+    const res = await auth(request(app).post('/social/dms')).send({
       recipientAnonId: 'anon-b',
       text: 'hey',
       includesConnectionRequest: 'yes',
     });
 
+    expect(res.status).toBe(200);
+    expect(mockSendRequest).toHaveBeenCalledWith(USER_ID, RECIPIENT_ID);
     expect(svc.sendDM).toHaveBeenCalledWith(MY_ANON, 'anon-b', 'hey', true);
+    expect(res.body.connectionRequest).toBe('sent');
+  });
+
+  it('still sends the DM and reports already_pending when a request is open', async () => {
+    const app = await buildApp();
+    const { RequestStateError } = await import('../services/connectionService');
+    mockSendRequest.mockRejectedValue(new RequestStateError('A pending request to this listener already exists'));
+    svc.sendDM.mockResolvedValue({ id: 'dm1' });
+
+    const res = await auth(request(app).post('/social/dms')).send({
+      recipientAnonId: 'anon-b',
+      text: 'hey again',
+      includesConnectionRequest: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(svc.sendDM).toHaveBeenCalledWith(MY_ANON, 'anon-b', 'hey again', true);
+    expect(res.body.connectionRequest).toBe('already_pending');
+  });
+
+  it('rejects asking yourself to connect, writing nothing', async () => {
+    const app = await buildApp();
+    session.resolveAnonId.mockResolvedValue(USER_ID);
+
+    const res = await auth(request(app).post('/social/dms')).send({
+      recipientAnonId: MY_ANON,
+      text: 'me',
+      includesConnectionRequest: true,
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockSendRequest).not.toHaveBeenCalled();
+    expect(svc.sendDM).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 and writes no DM when creating the request fails unexpectedly', async () => {
+    const app = await buildApp();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockSendRequest.mockRejectedValue(new Error('db down'));
+
+    const res = await auth(request(app).post('/social/dms')).send({
+      recipientAnonId: 'anon-b',
+      text: 'hey',
+      includesConnectionRequest: true,
+    });
+
+    expect(res.status).toBe(500);
+    expect(svc.sendDM).not.toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   it('returns 404 when the recipient is no longer addressable', async () => {

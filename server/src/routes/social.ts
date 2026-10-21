@@ -10,6 +10,7 @@
 import { Router, Request, Response } from 'express';
 import { addReaction, getReactionCounts, addComment, getComments, sendDM, getDMThread } from '../services/socialService';
 import { getOrCreateOpenSession, resolveAnonId } from '../services/sessionService';
+import { sendRequest, RequestStateError } from '../services/connectionService';
 import type { ReactionType } from '../types';
 
 const router = Router();
@@ -100,7 +101,11 @@ router.get('/comments/:broadcastId', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /social/dms — send a DM to an anonymous listener */
+/**
+ * POST /social/dms — send a DM to an anonymous listener. With
+ * includesConnectionRequest, also asks to connect: responds with
+ * connectionRequest 'sent', or 'already_pending' if one is still open.
+ */
 router.post('/dms', async (req: Request, res: Response) => {
   const { recipientAnonId, text, includesConnectionRequest } = req.body;
 
@@ -110,13 +115,33 @@ router.post('/dms', async (req: Request, res: Response) => {
   }
 
   try {
-    if (!(await resolveAnonId(recipientAnonId))) {
+    const recipientUserId = await resolveAnonId(recipientAnonId);
+    if (!recipientUserId) {
       res.status(404).json({ error: 'That listener is no longer in the feed' });
       return;
     }
+
+    // "Ask to connect" creates the real request here, before the DM, so the
+    // DM's flag never claims a request that doesn't exist.
+    let connectionRequest: 'sent' | 'already_pending' | undefined;
+    if (includesConnectionRequest) {
+      if (recipientUserId === req.userId) {
+        res.status(400).json({ error: "You can't connect with yourself" });
+        return;
+      }
+      try {
+        await sendRequest(req.userId!, recipientUserId);
+        connectionRequest = 'sent';
+      } catch (err) {
+        // The only state error left after the self check is an existing pending request
+        if (!(err instanceof RequestStateError)) throw err;
+        connectionRequest = 'already_pending';
+      }
+    }
+
     const { anonymousId } = await getOrCreateOpenSession(req.userId!);
-    const dm = await sendDM(anonymousId, recipientAnonId, text, !!includesConnectionRequest);
-    res.json({ dm });
+    const dm = await sendDM(anonymousId, recipientAnonId, text, connectionRequest !== undefined);
+    res.json(connectionRequest ? { dm, connectionRequest } : { dm });
   } catch (err) {
     console.error('Send DM error:', err);
     res.status(500).json({ error: 'Failed to send DM' });

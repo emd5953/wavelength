@@ -211,19 +211,22 @@ POST /social/dms { recipientAnonId, text, includesConnectionRequest }
 "Mine" in the UI = anything the other side didn't send.
 ```
 
-> Known gap: the "ask to connect" toggle only sets `includes_connection_request`
-> on the DM. It does **not** create a connection request (see section 9).
+With "ask to connect" on, the same call also creates the connection request
+(section 9). The footer reads `+ asked to connect`, or `+ already asked` if
+one was still pending.
 
 ## 9. Connection Lifecycle
 
-> Known gap: the server side below works and is tested, but the app never
-> calls `POST /connections/requests` (`sendConnectionRequest` in `api.ts` is
-> unused), and nothing links to `/connection-requests`. Today a request can
-> only be created through the API directly.
-
 ```
-POST /connections/requests { broadcasterAnonId }
-  └─ resolve the anonymous ID → user (404 if not addressable) → pending, 24h expiry
+In a DM: toggle "ask to connect" → send
+  POST /social/dms { recipientAnonId, text, includesConnectionRequest: true }
+    ├─ resolve recipient (404 if not addressable); yourself → 400
+    ├─ create pending request (24h expiry)  → connectionRequest: 'sent'
+    │     └─ one already pending            → connectionRequest: 'already_pending'
+    └─ save the DM, flagged
+  (POST /connections/requests { broadcasterAnonId } does the same without a DM)
+
+/connections ("people") → "requests · N waiting" card (refetched on focus)
 
 /connection-requests
   ├─ incoming: GET /connections/requests/incoming
@@ -313,9 +316,8 @@ Account delete  DMs for all session IDs, then the user row (cascade)
               │   │          └─ delete account → /
               │   │
               │   └──▶ /connections ("people")
+              │          ├──▶ /connection-requests  ("requests" card)
               │          └──▶ /connection-detail?connectionId=X
               │
               └──▶ /location-required  (permission not granted)
-
-/connection-requests   registered, but no in-app link to it yet
 ```

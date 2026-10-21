@@ -21,6 +21,7 @@ export default function ConnectionsRoute() {
       onSelectConnection={(connectionId) =>
         router.push(`/connection-detail?connectionId=${connectionId}`)
       }
+      onOpenRequests={() => router.push('/connection-requests')}
     />
   );
 }

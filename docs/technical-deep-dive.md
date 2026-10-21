@@ -150,9 +150,9 @@ All routes except `/auth/*` and `/health` require a Bearer token.
 | `GET /social/reactions/:broadcastId` | Counts |
 | `POST /social/comments` `{ broadcastId, text }` | Comment as the caller's session. 404 if the play has expired |
 | `GET /social/comments/:broadcastId` | Thread |
-| `POST /social/dms` `{ recipientAnonId, text, includesConnectionRequest }` | DM as the caller's session. 404 if the recipient isn't addressable |
+| `POST /social/dms` `{ recipientAnonId, text, includesConnectionRequest }` | DM as the caller's session. 404 if the recipient isn't addressable. With the flag, also creates the connection request and returns `connectionRequest: 'sent' \| 'already_pending'` (400 if asking yourself) |
 | `GET /social/dms/:otherAnonId` | The caller's thread with that ID, across all the caller's sessions. Only participants can read it |
-| `POST /connections/requests` `{ broadcasterAnonId }` | Request to connect. 404 if the ID is no longer addressable |
+| `POST /connections/requests` `{ broadcasterAnonId }` | Request to connect without a DM. 404 if the ID is no longer addressable. The app uses the DM flag instead |
 | `GET /connections/requests/incoming` · `/outgoing` | Pending requests |
 | `POST /connections/requests/:id/accept` · `/decline` · `/cancel` | 403 if the caller isn't entitled, 409 if not pending |
 | `GET /connections`, `GET /connections/:id`, `DELETE /connections/:id` | Connections and the revealed profile |
