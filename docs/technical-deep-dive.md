@@ -1,307 +1,324 @@
 # Wavelength — Technical Deep Dive
 
+How the system works today. For *why* it works this way, see
+`docs/product-overview.md` (product decisions) and `docs/specs/` (design
+records for each change).
+
 ## Architecture Overview
 
-Wavelength is a proximity-based music discovery app. Users who have linked their Spotify accounts automatically broadcast what they're listening to, and other users nearby can see those broadcasts in a live feed.
+Wavelength is a proximity-based music discovery app. Users who have linked
+Spotify are polled by the server, and every track they play becomes a **play**
+at their location. Other users nearby see live and recent plays (the last 6
+hours) in a feed, anonymously.
 
-The system has two main layers:
-- **Mobile client** (React Native / Expo) — handles auth, GPS, and feed display
-- **Backend server** (Node.js / Express) — handles Spotify polling, broadcast management, and real-time updates
+Two layers:
+- **Mobile client** (React Native, Expo dev build, iOS): auth, GPS, the
+  presence heartbeat, and the feed UI.
+- **Backend** (Node.js / Express / Socket.IO, PostgreSQL + PostGIS): Spotify
+  polling, sessions and plays, the feed, social, connections, and push.
+
+The server is the **only writer of plays**. The app never posts what you're
+listening to; it only reports where you are and that it's open.
 
 ## Core Flow
 
 ```
-User signs up → Links Spotify → Server stores tokens
-                                      ↓
-                Server polls Spotify every 15s for all users
-                                      ↓
-              User playing music? → Create/update broadcast with last known location
-              Not playing?        → Remove broadcast
-                                      ↓
-              Other users nearby see the broadcast in their feed
+User links Spotify ──▶ server stores tokens
+                              │
+            server polls Spotify every 15s for every user with a location
+                              │
+     playing ─▶ continue / start / resume a play in the user's listening session
+     paused  ─▶ end the live play (it stays in the feed as "earlier" for 6h)
+                              │
+     viewers nearby see live plays first, then the last 6h, newest first
 ```
+
+## Core Concepts
+
+### Listening sessions
+
+A **session** is a user's anonymous identity for one stretch of activity
+(`listening_sessions`, `services/sessionService.ts`).
+
+- Each session has one random `anonymous_id`. Every play, comment, reaction
+  and DM in the session uses it, so DMs and connection requests carry across
+  tracks.
+- A session is opened by **playback** (the poller) or by **presence** (the app
+  is open, `POST /account/presence`). There is at most one open session per
+  user, enforced by a partial unique index.
+- A session **ends** when the user has stopped playing **and** been away from
+  the app for 5+ minutes, and has no live play. The next playback or presence
+  opens a new session with a new ID.
+- Sessions are kept until account deletion. They hold no location, and keeping
+  them is what lets DM threads and account deletion find past IDs.
+
+### Plays
+
+A **play** is one track by one listener at one place (the `broadcasts` table;
+the name predates the concept).
+
+- `ended_at IS NULL` means live. The poller updates `last_seen_at` while the
+  track keeps playing.
+- Pausing ends the play. Resuming the **same track within 5 minutes reopens
+  it** instead of creating a duplicate.
+- A different track ends the previous play and starts a new one.
+- Plays stay in the feed for **6 hours after ending**. After that they're
+  deleted, along with their reactions and comments (cascade) and their
+  location.
+- Location is recorded **exactly**, where the play started. Fuzzing was
+  removed by decision on 2026-10-21; see Privacy Model.
 
 ## Authentication
 
-1. Mobile app initiates Spotify OAuth (authorization code flow, no PKCE)
-2. User authorizes on Spotify's login page
-3. Mobile app receives auth code, sends it to `POST /auth/callback` on the server
-4. Server exchanges code for access + refresh tokens via Spotify's token endpoint
-5. Server fetches Spotify user profile (`/v1/me`) to get the Spotify user ID
-6. Server upserts the user in the `users` table with encrypted tokens
-7. Server returns the access token to the mobile app for subsequent API calls
+1. The app runs Spotify OAuth (authorization code flow, **no PKCE**) with
+   redirect URI `wavelength://callback`.
+2. The app sends the code to `POST /auth/callback`.
+3. The server exchanges it for tokens using the client secret, fetches
+   `/v1/me`, and upserts the user.
+4. In the background it syncs top artists and tracks (for taste match) and
+   short-term top tracks (for on-repeat push).
+5. The server returns the access token, which the app sends as a Bearer token
+   on every API call.
 
-The server's auth middleware (`authMiddleware`) validates requests by matching the Bearer token against stored `encrypted_access_token` values in the database.
+`authMiddleware` resolves the Bearer token to `req.userId` by matching
+`users.encrypted_access_token`. **Every route takes the acting user from
+`req.userId`**, never from the body, query or path.
 
 ## Server-Side Spotify Polling
 
-This is the key architectural decision that makes Wavelength work without requiring users to have the app open.
+`services/spotifyPoller.ts`, every 15s, for every user with a last known
+location:
 
-**How it works:**
-- `spotifyPoller.ts` runs on the server, polling every 15 seconds
-- It queries all registered users from the database
-- For each user with a last known location, it calls Spotify's `/v1/me/player/currently-playing`
-- If the user is playing a track, it creates/updates a broadcast in the `broadcasts` table
-- If the user stopped playing, it removes their broadcast
-- Token refresh is handled automatically when tokens expire
+| Spotify says | What happens |
+|---|---|
+| Playing track T | `recordPlayback`: **continued** (same live play), **resumed** (same track, ended < 5 min ago), or **started** (new play; ends any other live play) |
+| 204 / `is_playing: false` | `recordNotPlaying`: end the live play, emit `broadcast:ended` |
+| Error (401, 429, 5xx) | **Nothing.** An error says nothing about playback. If errors persist, the scheduler ends the play after 60s |
 
-**Why server-side polling?**
-- Users don't need the app open to broadcast
-- Once a user has signed up and granted Spotify access, their music shows up automatically
-- The only requirement is a last known location (updated whenever the app is opened)
+On **started** the poller emits `broadcast:new` and runs on-repeat push. On
+**resumed** it emits `broadcast:new` again so clients flip the card back to
+live. It also re-syncs the user's on-repeat tracks when they're more than 24h
+old.
+
+This is what lets users broadcast without the app open: all it needs is a
+location, which background location keeps fresh.
 
 ## Location Handling
 
-Location is a two-part system:
-
-1. **Real-time GPS** — When the app is open, it polls GPS and sends location to `POST /account/location`, updating `last_latitude`, `last_longitude`, and `last_location_at` on the user record
-2. **Last known location** — When the app is closed, the server uses the last stored location for broadcasts
-
-This means a user who was at a coffee shop and closed the app will still show up at that coffee shop as long as they're playing music on Spotify.
+1. **Foreground:** the feed reads GPS on every refresh and posts it to
+   `POST /account/location` (`users.last_latitude`, `last_longitude`,
+   `last_location_at`).
+2. **Background:** `backgroundLocation.ts` (expo-task-manager, 60s / 50m)
+   posts the same thing while the app is closed.
+3. **Plays** copy the user's last location when they start. The poller has
+   nothing else to go on.
 
 ## Database Schema (PostGIS)
 
-Key tables:
-- `users` — Spotify credentials, last known location
-- `broadcasts` — Active music broadcasts with PostGIS geography points
-- `reactions` — Emoji reactions on broadcasts
-- `comments` — Text comments on broadcasts
-- `direct_messages` — Anonymous DMs between users
-- `connection_requests` — Pending mutual connection requests
-- `connections` — Accepted connections (identity revealed)
-- `user_settings` — Per-user vicinity radius (50m–500m)
+Migrations live in `server/src/db/migrations/` and **all of them re-run on
+every boot**, so every statement must be safe to re-run.
 
-Spatial queries use PostGIS `ST_DWithin` for radius-based broadcast filtering, with a GIST index on the `location` column.
+| Table | Holds |
+|---|---|
+| `users` | Spotify tokens, last location, `push_token`, `last_app_seen_at`, `repeat_tracks_synced_at` |
+| `listening_sessions` | `anonymous_id`, `started_at`, `last_playing_at`, `ended_at` |
+| `broadcasts` | Plays: `session_id`, track fields, `track_id`, `location` (geography), `started_at`, `last_seen_at`, `ended_at` |
+| `reactions` / `comments` | Per play, keyed by the actor's anonymous ID; cascade with the play |
+| `direct_messages` | `sender_anon_id` → `recipient_anon_id` |
+| `connection_requests` / `connections` | By real user ID; 24h request expiry |
+| `user_top_artists` / `user_top_tracks` | Medium-term top 20s, for taste match |
+| `user_repeat_tracks` | Short-term top 50 track IDs, for on-repeat push |
+| `push_notifications_sent` | `(recipient, listener, track)` dedup for push |
+| `user_settings` | Unused; the app keeps the radius on-device |
+
+Spatial queries use `ST_DWithin` on geography with a GIST index on
+`broadcasts.location`.
+
+## API
+
+All routes except `/auth/*` and `/health` require a Bearer token.
+
+| Route | Purpose |
+|---|---|
+| `POST /auth/callback`, `POST /auth/refresh` | OAuth code exchange, token refresh |
+| `GET /feed/nearby?lat&lng&radius` | Plays in range (radius clamped 50–500m, default 100), live or ended within 6h, excluding the caller's own; live first, then newest. Each item has `isLive`, `endedAt`, `anonymousId`, exact `location`, `tasteScore`, `timeSinceStart`; never `userId` |
+| `POST /account/presence` | Heartbeat. Opens or keeps the caller's session, returns `{ anonymousId }` |
+| `POST /account/location` | Update last known location |
+| `POST /account/push-token` | Store the Expo push token |
+| `DELETE /account/me` | Delete the **caller's** account (the path segment is ignored) |
+| `POST /social/reactions` `{ broadcastId, type }` | React as the caller's session. 404 if the play has expired |
+| `GET /social/reactions/:broadcastId` | Counts |
+| `POST /social/comments` `{ broadcastId, text }` | Comment as the caller's session. 404 if the play has expired |
+| `GET /social/comments/:broadcastId` | Thread |
+| `POST /social/dms` `{ recipientAnonId, text, includesConnectionRequest }` | DM as the caller's session. 404 if the recipient isn't addressable |
+| `GET /social/dms/:otherAnonId` | The caller's thread with that ID, across all the caller's sessions. Only participants can read it |
+| `POST /connections/requests` `{ broadcasterAnonId }` | Request to connect. 404 if the ID is no longer addressable |
+| `GET /connections/requests/incoming` · `/outgoing` | Pending requests |
+| `POST /connections/requests/:id/accept` · `/decline` · `/cancel` | 403 if the caller isn't entitled, 409 if not pending |
+| `GET /connections`, `GET /connections/:id`, `DELETE /connections/:id` | Connections and the revealed profile |
+
+An anonymous ID is **addressable** while its session is open, or while it has
+a play still inside the 6h feed window.
 
 ## Real-Time Updates (Socket.IO)
 
-The feed uses a hybrid approach:
-- **HTTP polling** — Mobile app fetches `/feed/nearby` every 10 seconds
-- **WebSocket push** — Server emits `broadcast:new` and `broadcast:removed` events to connected clients within range
+The feed is hybrid:
+- **HTTP refresh** of `/feed/nearby` every 10s (the source of truth; it also
+  drops plays past 6h).
+- **Socket events:** `broadcast:new` (a feed item, sent to clients within
+  range) when a play starts or resumes, and `broadcast:ended` (play ID, sent
+  to all clients) when one stops being live.
 
-The `feedSocket.ts` service maintains a map of connected clients with their last known location and radius. When a new broadcast is created, it checks which connected clients are within range and pushes the update.
+Disconnecting only forgets the client's subscription; plays outlive sockets.
+Plays ended by the scheduler's stale check emit nothing, and clients pick them
+up on the next refresh.
+
+## Scheduler (`scheduler.ts`)
+
+| Every | Job |
+|---|---|
+| 30s | `endStalePlays`: live plays not seen for 60s are ended at `last_seen_at` |
+| 30s | `expireOldPlays`: delete plays ended more than 6h ago |
+| 60s | `expireStaleRequests`: pending connection requests older than 24h → `expired` |
+| 60s | `endIdleSessions`: the session-end rule above |
+
+## On-Repeat Push Notifications
+
+You get a push when someone nearby starts playing a track you've had on
+repeat lately.
+
+- **"On repeat"** means Spotify short-term top tracks (`time_range=short_term`,
+  ~4 weeks, top 50), synced at login and re-synced by the poller every 24h.
+  Spotify's own "On Repeat" playlist isn't readable through the API.
+- **Recipients** have a push token, a last location within 500m of the play,
+  and the play's `track_id` in `user_repeat_tracks`. The listener is never
+  notified about their own play.
+- **Dedup:** each `(recipient, listener, track)` is notified at most once,
+  ever, and tracked by account, so a new session doesn't re-notify. The insert
+  into `push_notifications_sent ... ON CONFLICT DO NOTHING RETURNING` decides
+  who gets sent to, atomically.
+- Sent through the Expo push API in batches of 100.
+
+The app registers its token on first feed load (`pushNotifications.ts` →
+`POST /account/push-token`). Simulators can't obtain push tokens.
+
+## Music Taste Matching
+
+- On login, `syncUserTaste` stores the medium-term top 20 artists and tracks.
+- `getTasteScore(a, b)`: shared artists ×3 (max 60), plus shared tracks ×2
+  (max 40), out of 100 and case-insensitive.
+- The feed returns it per item, and the card shows `· 42% match` when it's
+  above 0.
 
 ## Privacy Model
 
-- Broadcasts are anonymous — each broadcast gets a random UUID as `anonymous_id`
-- GPS coordinates are only stored on active broadcasts and as last known location
-- When a broadcast is removed, its location data is deleted
-- Session cleanup (`privacyService.ts`) removes broadcast data on disconnect
-- Account deletion cascades to all user data (broadcasts, DMs, connections, etc.)
+- **Anonymous by default.** Viewers see a session's random ID, never a user
+  ID, and the server assigns every ID. Clients can't choose or spoof one, and
+  the server ignores any ID a client sends for itself.
+- **Exact location, by decision (2026-10-21).** Plays show where the listener
+  actually was. This is a known risk to revisit before public launch; see the
+  product overview.
+- **Short-lived.** Plays and their locations are deleted 6h after ending. The
+  user's last location is kept on `users` for the poller.
+- **Mutual reveal.** Spotify profiles are shown only after both sides accept a
+  connection.
+- **Leaving is total.** `DELETE /account/me` deletes DMs from every session ID
+  the user held, then the user row, which cascades to everything else.
 
 ## Mobile App Structure
 
 ```
 mobile/
-├── app/                    # Expo Router screens
-│   ├── index.tsx           # Login screen
-│   ├── nearby-feed.tsx     # Main feed (broadcasts nearby)
-│   ├── comment-thread.tsx  # Comments on a broadcast
-│   ├── dm.tsx              # Direct messaging
-│   ├── connections.tsx     # Connections list
-│   ├── connection-detail.tsx
-│   ├── connection-requests.tsx
-│   ├── location-required.tsx
-│   └── _layout.tsx         # Root layout (Stack navigator)
-├── src/
-│   ├── components/         # Reusable UI components
-│   ├── config/spotify.ts   # Spotify OAuth config
-│   └── services/           # API client, auth, GPS, polling, sockets
+├── app/                        # Expo Router screens
+│   ├── _layout.tsx             # Stack, header styles, font loading, LinearGradient interop
+│   ├── index.tsx               # Login (redirects to onboarding / feed)
+│   ├── onboarding.tsx
+│   ├── nearby-feed.tsx         # Feed: data, sockets, presence, sections
+│   ├── comment-thread.tsx · dm.tsx
+│   ├── connections.tsx · connection-detail.tsx · connection-requests.tsx
+│   ├── profile.tsx             # Radius slider, log out, delete account
+│   └── location-required.tsx
+├── assets/fonts/paper-mono/    # Paper Mono, SIL OFL 1.1
+└── src/
+    ├── components/
+    │   ├── ui.tsx              # Design-system primitives + COLORS
+    │   ├── Conversation.tsx    # Bubbles + composer (comments, DMs)
+    │   ├── FeedHeader.tsx      # Blurred-art header, counts, nav, list/map toggle
+    │   ├── BroadcastCard.tsx · FeedMap.tsx
+    │   └── Connection*Screen.tsx · CommentThread.tsx · DMScreen.tsx
+    ├── config/spotify.ts       # OAuth config
+    └── services/
+        ├── api.ts              # REST client (authFetch)
+        ├── presence.ts         # 60s heartbeat while foregrounded; caches my anonymous ID
+        ├── feedSocket.ts       # broadcast:new / broadcast:ended
+        ├── gps.ts · backgroundLocation.ts · pushNotifications.ts
+        └── spotifyAuth.ts
 ```
 
 ## Server Structure
 
 ```
-server/
-├── src/
-│   ├── db/
-│   │   ├── connection.ts       # PostgreSQL pool
-│   │   ├── migrate.ts          # Migration runner
-│   │   └── migrations/         # SQL migration files
-│   ├── middleware/
-│   │   ├── auth.ts             # Bearer token validation
-│   │   └── errorHandler.ts
-│   ├── routes/
-│   │   ├── auth.ts             # Spotify OAuth callback + refresh
-│   │   ├── feed.ts             # Nearby feed endpoint
-│   │   ├── broadcast.ts        # Create/remove broadcasts
-│   │   ├── social.ts           # Reactions, comments, DMs
-│   │   ├── connections.ts      # Connection requests + management
-│   │   └── account.ts          # Location updates + account deletion
-│   ├── services/
-│   │   ├── broadcastService.ts # Broadcast CRUD + spatial queries
-│   │   ├── spotifyPoller.ts    # Server-side Spotify polling
-│   │   ├── feedSocket.ts       # WebSocket real-time updates
-│   │   ├── privacyService.ts   # Session cleanup + account deletion
-│   │   └── proximityService.ts # Radius validation
-│   ├── scheduler.ts            # Periodic cleanup tasks
-│   └── index.ts                # Express app entry point
+server/src/
+├── db/                     # pool, migration runner, migrations 001–004
+├── middleware/             # auth (Bearer → req.userId), errorHandler
+├── routes/                 # auth, feed, social, connections, account
+├── services/
+│   ├── sessionService.ts   # Sessions, presence, anonymous-ID resolution
+│   ├── broadcastService.ts # Play lifecycle + feed query
+│   ├── spotifyPoller.ts    # The only writer of plays
+│   ├── pushService.ts      # On-repeat push with dedup
+│   ├── tasteService.ts     # Taste sync + score, repeat-track sync
+│   ├── socialService.ts · connectionService.ts · privacyService.ts
+│   ├── feedSocket.ts       # Socket emits
+│   └── proximityService.ts # Radius clamp
+├── scheduler.ts
+└── index.ts
 ```
+
+`server/src/db/redis.ts` exists but nothing imports it. Redis runs in
+`docker-compose` and is currently unused.
+
+## Design System
+
+Sky palette and Paper Mono. The reasoning is in
+`docs/design/222-reference.md`.
+
+- **Tokens** (`mobile/tailwind.config.js`; raw values in `ui.tsx` `COLORS`):
+  `night` `#051F33`, `ground` `#082F49`, `ground-lift` `#0C4A6E`, `primary`
+  `#075985`, `ink` `#F0F9FF`, `ink-muted` / `ink-dim` (sky-100/200 at
+  65%/45%), `card` / `rule` (sky-50 at 6%/15%), and `live` `#38BDF8` (the
+  only bright color).
+- **Type:** `font-mono-light` / `font-mono` / `font-mono-medium` /
+  `font-mono-semibold`, one family per weight because React Native can't
+  synthesize weights for custom fonts. Copy is lowercase; section labels are
+  tracked uppercase on hairlines.
+- **Rules:** no shadows, no emoji except the reactions, one filled
+  (`primary`) action per screen, and album art as the only source of color.
+- NativeWind only applies `className` to components it knows about.
+  Third-party components (like `LinearGradient`) need `cssInterop` in
+  `_layout.tsx`.
 
 ## Development Setup
 
 ### Prerequisites
-- Node.js 18+
-- PostgreSQL with PostGIS extension
-- Docker (for database via docker-compose)
-- Spotify Developer account with app configured
-
-### Spotify Dashboard Config
-- Redirect URI: `exp://<your-ip>:8081/--/callback` (for Expo Go development)
-- Required scopes: `user-read-currently-playing`, `user-read-playback-state`, `user-top-read`, `user-read-email`, `user-read-private`
-- Users must be whitelisted in development mode (up to 25)
+- Node.js 18+, Docker, Xcode (iOS simulator)
+- A Spotify Developer app with redirect URI `wavelength://callback` and scopes
+  `user-read-currently-playing`, `user-read-playback-state`, `user-top-read`,
+  `user-read-email`, `user-read-private`
+- In development mode, Spotify only allows allowlisted users (up to 25)
 
 ### Running Locally
 ```bash
-# Start database
-docker-compose up -d
-
-# Start server
-cd server && npm run dev
-
-# Start mobile app
-cd mobile && npx expo start
+docker compose up -d                 # Postgres + PostGIS (and Redis, unused)
+cd server && npm run dev             # API + poller + scheduler on :3000
+cd mobile && npx expo run:ios        # native dev build + Metro on :8081
 ```
+Pin the simulator's location with `xcrun simctl location booted set <lat>,<lng>`.
 
 ### Environment Variables
 
-**Server (`server/.env`):**
-| Variable | Description |
-|---|---|
-| `SPOTIFY_CLIENT_ID` | Spotify app client ID |
-| `SPOTIFY_CLIENT_SECRET` | Spotify app client secret |
-| `DB_HOST` | PostgreSQL host |
-| `DB_PORT` | PostgreSQL port |
-| `DB_NAME` | Database name |
-| `DB_USER` | Database user |
-| `DB_PASSWORD` | Database password |
-| `REDIS_URL` | Redis connection string |
-| `PORT` | Server port (default 3000) |
-| `CORS_ORIGIN` | Allowed CORS origin |
+**Server (`server/.env`):** `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`,
+`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `PORT` (default
+3000), `CORS_ORIGIN`, and `REDIS_URL` (unused).
 
-**Mobile (`mobile/.env`):**
-| Variable | Description |
-|---|---|
-| `EXPO_PUBLIC_API_URL` | Backend server URL |
-| `EXPO_PUBLIC_SPOTIFY_CLIENT_ID` | Spotify app client ID |
-
-## Location Privacy — Coordinate Fuzzing
-
-Broadcast locations are never exposed at exact GPS coordinates. The server applies a random offset of 100–200m in a random direction before returning feed data to clients. This is done in the `/feed/nearby` route using a Haversine-based offset calculation.
-
-This means:
-- The map view shows the general area where someone is listening, not their exact position
-- Each feed request generates a new random offset, so the pin shifts slightly each time
-- The raw GPS data is only stored server-side and never sent to other clients at full precision
-
-Combined with anonymous broadcast IDs, there is no way for a feed viewer to determine who is listening or exactly where they are.
-
-## Onboarding Flow
-
-First-time users see a 4-slide onboarding sequence before reaching the login screen:
-
-1. **Welcome** — introduces Wavelength and its purpose
-2. **Location-Based Discovery** — explains proximity-based feed and location fuzzing
-3. **Anonymous Connections** — describes the anonymous interaction model
-4. **Privacy** — explains data handling and account deletion
-
-Onboarding completion is stored in `expo-secure-store` under the key `onboarding_complete`. The index screen checks this value on mount and redirects to onboarding if not set. Users can skip onboarding at any time.
-
-## Profile Screen
-
-The profile screen (`/profile`) provides:
-- Display of the user's Spotify display name and email (fetched from Spotify's `/v1/me` endpoint)
-- Navigation back to the feed
-- Logout — clears stored tokens and returns to login
-- Account deletion — prompts for confirmation, then calls `DELETE /account/me` on the server (cascades all user data), clears local tokens and onboarding state
-
-## Map View
-
-The feed supports two view modes toggled via List/Map buttons:
-
-- **List view** — the default, showing broadcast cards in a scrollable list
-- **Map view** — renders a `react-native-maps` MapView centered on the user's current location, with green pins for each nearby broadcast
-
-Tapping a map pin opens a callout showing the album art, track title, and artist name. Pins use the fuzzed coordinates from the server, so they represent the general area rather than exact positions.
-
-The map region is initialized from the user's current GPS position with a tight zoom level (~500m visible area) to match the app's proximity focus.
-
-## Feed Navigation
-
-The feed screen nav bar includes:
-- **List / Map toggle** — switches between feed views, with active state highlighted in green
-- **Connections** — navigates to the connections list
-- **Profile (👤)** — navigates to the profile screen
-
-
-## Dark Mode
-
-The entire app uses a dark theme with a consistent color palette:
-
-- Background: `#121212` (screens, headers, nav)
-- Card/surface: `#1e1e1e` (broadcast cards, chat bubbles, list items)
-- Elevated surface: `#2a2a2a` (buttons, inputs, reaction pills)
-- Primary text: `#fff`
-- Secondary text: `#aaa` / `#ccc`
-- Muted text: `#666`
-- Accent: `#1DB954` (Spotify green — buttons, active states, badges)
-- Destructive: `#d32f2f` (delete/remove actions)
-
-The Stack navigator in `_layout.tsx` applies dark header styling globally via `screenOptions`. All screens, components, inputs, and chat bubbles follow this palette.
-
-## Discovery Radius Setting
-
-Users can adjust their discovery radius (50m–500m) from the profile screen using a slider (`@react-native-community/slider`). The value is persisted in `expo-secure-store` under the key `discovery_radius` and read by the feed screen on each load. The server validates and clamps the radius in `proximityService.ts`.
-
-## Background Location
-
-`backgroundLocation.ts` uses `expo-task-manager` and `expo-location` to keep the user's location updated even when the app is not in the foreground.
-
-- Registers a background task (`wavelength-background-location`) that fires on location changes
-- Configured with `Accuracy.Balanced`, 60-second interval, 50m distance threshold
-- Each update POSTs the new coordinates to `POST /account/location`
-- On Android, shows a persistent foreground service notification
-- On iOS, uses the background location indicator
-
-This ensures the server-side Spotify poller always has a reasonably fresh location for creating broadcasts, even if the user hasn't opened the app recently.
-
-## Push Notifications
-
-Push notifications alert users when someone nearby starts playing music.
-
-**Mobile side (`pushNotifications.ts`):**
-- Requests notification permissions on first feed load
-- Registers an Expo push token via `Notifications.getExpoPushTokenAsync()`
-- Sends the token to `POST /account/push-token` for server storage
-- Configures the notification handler to show alerts with sound
-
-**Server side (`pushService.ts`):**
-- When a new broadcast is created (`POST /broadcasts`), the server queries all users within 500m who have a push token stored
-- Uses PostGIS `ST_DWithin` against each user's `last_latitude`/`last_longitude`
-- Sends notifications via the Expo Push API (`https://exp.host/--/api/v2/push/send`) in batches of 100
-- Notification includes the track title and artist name
-
-**Database:**
-- Migration `002_push_tokens.sql` adds a `push_token TEXT` column to the `users` table
-
-## Music Taste Matching
-
-Wavelength computes a taste similarity score between users based on their Spotify listening history.
-
-**Data collection (`tasteService.ts` — `syncUserTaste`):**
-- On login, the server fetches the user's top 20 artists and top 20 tracks from Spotify's `/v1/me/top/artists` and `/v1/me/top/tracks` (medium-term range)
-- Stored in `user_top_artists` and `user_top_tracks` tables with rank ordering
-
-**Score computation (`tasteService.ts` — `getTasteScore`):**
-- Compares two users' top artists and tracks using case-insensitive matching
-- Shared artists: 3 points each (max 60)
-- Shared tracks: 2 points each (max 40)
-- Total score: 0–100
-
-**Feed integration:**
-- The `/feed/nearby` route computes a taste score between the requesting user and each broadcaster
-- The score is returned as `tasteScore` in the feed response
-- The `BroadcastCard` component displays a green badge (e.g., "42% match") when the score is above 0
-
-**Database:**
-- Migration `003_music_taste.sql` creates `user_top_artists` and `user_top_tracks` tables
+**Mobile (`mobile/.env`):** `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`.

@@ -1,5 +1,8 @@
 # Wavelength — Application Workflow
 
+Step-by-step flows through the app and server. For the system reference
+(schema, API table, design tokens) see `docs/technical-deep-dive.md`.
+
 ## High-Level Flow
 
 ```
@@ -14,470 +17,285 @@
 ## 1. App Launch & Entry (`app/index.tsx`)
 
 ```
-App opens
+App opens (fonts load first; the root layout renders nothing until they do)
   │
-  ├─ Check SecureStore for `onboarding_complete`
-  │   └─ NOT set → redirect to /onboarding
+  ├─ SecureStore `onboarding_complete` not set → /onboarding
   │
-  ├─ Check SecureStore for stored Spotify tokens
-  │   ├─ Tokens exist AND not expired → redirect to /nearby-feed
-  │   └─ No tokens or expired → show Login screen
+  ├─ Stored Spotify tokens exist and aren't expired → /nearby-feed
   │
-  └─ User taps "Log in with Spotify" → triggers OAuth flow
+  └─ Otherwise → login screen → "continue with spotify" → OAuth
 ```
 
 ## 2. Onboarding (`app/onboarding.tsx`)
 
 ```
-4-slide carousel:
-  1. Welcome to Wavelength
-  2. Location-Based Discovery (explains GPS fuzzing)
-  3. Anonymous Connections
-  4. Privacy & Data Handling
+4 slides, each a lead-in plus a statement:
+  1. "welcome to" / wavelength
+  2. "let us show you" / what's playing around you   (says location is visible on the map)
+  3. "say something" / without saying who you are
+  4. "you decide" / when to be known
 
-User can:
-  - Tap "Next" through slides
-  - Tap "Skip" at any time
-  - Tap "Get Started" on final slide
-
-All paths → set `onboarding_complete` in SecureStore → redirect to /
+"continue" through the slides, "skip" at any time, "get started" on the last.
+All paths → set `onboarding_complete` → /
 ```
 
-## 3. Authentication Flow
+## 3. Authentication
 
-### Mobile Side (`src/services/spotifyAuth.ts`)
+### Mobile (`src/services/spotifyAuth.ts`)
 
 ```
-User taps Login
+"continue with spotify"
   │
-  ├─ Create AuthSession.AuthRequest with Spotify scopes:
-  │     user-read-currently-playing, user-read-playback-state,
-  │     user-top-read, user-read-email, user-read-private
-  │
-  ├─ Open Spotify OAuth page (authorization code flow, no PKCE)
-  │
-  ├─ User authorizes → receive auth code
+  ├─ AuthSession request: authorization code, no PKCE,
+  │   redirect wavelength://callback, scopes:
+  │   user-read-currently-playing, user-read-playback-state,
+  │   user-top-read, user-read-email, user-read-private
   │
   └─ POST /auth/callback { code, redirectUri }
-       │
-       └─ Receive { accessToken, refreshToken, expiresAt }
-            │
-            └─ Store all three in expo-secure-store
+       └─ store { accessToken, refreshToken, expiresAt } in SecureStore
 ```
 
-### Server Side (`routes/auth.ts`)
+### Server (`routes/auth.ts`)
 
 ```
 POST /auth/callback
-  │
-  ├─ Exchange auth code for tokens at Spotify's token endpoint
-  │
-  ├─ Fetch user profile from Spotify /v1/me → get spotifyUserId
-  │
-  ├─ Upsert user in `users` table (spotify_user_id, tokens, expiry)
-  │
-  ├─ Kick off background taste sync (syncUserTaste)
-  │     └─ Fetches top 20 artists + top 20 tracks from Spotify
-  │     └─ Stores in user_top_artists / user_top_tracks tables
-  │
+  ├─ Exchange code for tokens (client secret)
+  ├─ GET Spotify /v1/me → upsert user
+  ├─ Background: syncUserTaste      (medium-term top 20 artists + tracks)
+  ├─ Background: syncRepeatTracks   (short-term top 50 tracks, for push)
   └─ Return { userId, accessToken, refreshToken, expiresAt }
 ```
 
-### Token Refresh
+### Token refresh and auth middleware
 
 ```
-SpotifyAuthModule.getValidToken()
-  │
-  ├─ Token still valid (>60s remaining)? → return it
-  │
-  └─ Expired → POST /auth/refresh { refreshToken }
-       │
-       ├─ Server refreshes with Spotify, updates DB
-       └─ Returns new { accessToken, expiresAt }
-```
+getValidToken(): valid for > 60s? use it : POST /auth/refresh
 
-### Auth Middleware (`middleware/auth.ts`)
-
-```
 Every protected request:
-  │
-  ├─ Extract Bearer token from Authorization header
-  ├─ Look up token in `users.encrypted_access_token`
-  ├─ Found → attach req.userId, continue
-  └─ Not found → 401 Unauthorized
+  Bearer token → users.encrypted_access_token → req.userId   (else 401)
+  Routes only ever act as req.userId, never an ID from the body/query/path.
 ```
 
-## 4. Location System
-
-### Foreground GPS (`src/services/gps.ts`)
+## 4. Location
 
 ```
-Feed screen loads → GPSModule.requestPermission()
-  │
-  ├─ Granted → GPSModule.getCurrentPosition()
-  │     └─ Returns { latitude, longitude, accuracy, timestamp }
-  │
-  └─ Denied → redirect to /location-required
+Feed refresh (every 10s)
+  ├─ GPSModule.requestPermission()  (not granted → /location-required)
+  ├─ GPSModule.getCurrentPosition()
+  └─ POST /account/location → users.last_latitude / last_longitude
+
+Background (backgroundLocation.ts, expo-task-manager, 60s / 50m)
+  └─ POST /account/location while the app is closed
 ```
 
-### Background Location (`src/services/backgroundLocation.ts`)
+`/location-required` explains that location powers the feed and that nearby
+people see where you're listening on the map, then offers "open settings".
+
+> Known issue: the 10s refresh can hit the permission check while the app is
+> backgrounded and replace the stack with `/location-required`.
+
+## 5. Presence and Listening Sessions
 
 ```
-On feed load → startBackgroundLocation()
+Feed mounts → startPresence()  (src/services/presence.ts)
   │
-  ├─ Request foreground + background permissions
+  ├─ App foregrounded → POST /account/presence now and every 60s
+  │     └─ server: users.last_app_seen_at = NOW()
+  │               get or create the open session → { anonymousId }
+  │               (cached on the client for "is this my comment")
   │
-  └─ Register expo-task-manager task: "wavelength-background-location"
-       │
-       ├─ Fires on location change (60s interval, 50m distance)
-       ├─ POSTs new coords to POST /account/location
-       └─ Server updates users.last_latitude / last_longitude
+  └─ App backgrounded → heartbeat stops
+
+Session ends (scheduler, every 60s) when ALL of:
+  ├─ no playback seen for 5+ min
+  ├─ app not seen for 5+ min
+  └─ no live play in the session
+Next playback or presence → new session → new anonymous ID
 ```
 
-### Location Required Screen (`app/location-required.tsx`)
+## 6. Broadcasting: How Music Gets Into the Feed
+
+The **server poller is the only writer**. The app never posts plays.
 
 ```
-Shown when GPS permission is denied.
-  └─ "Open Settings" button → links to device settings
+spotifyPoller.ts, every 15s, for every user with a last location:
+  │
+  ├─ Refresh the Spotify token if expired
+  ├─ Repeat tracks older than 24h? → syncRepeatTracks
+  │
+  ├─ GET /v1/me/player/currently-playing
+  │     ├─ 204 or is_playing:false → recordNotPlaying
+  │     │     └─ end live play (ended_at = now) → emit broadcast:ended
+  │     ├─ other error (401/429/5xx) → change nothing
+  │     └─ playing track T → recordPlayback(user, T, last location)
+  │
+  └─ recordPlayback, in the user's open session (opened if needed):
+        ├─ latest play is T and live            → continued (bump last_seen_at)
+        ├─ latest play is T, ended < 5 min ago  → resumed  → emit broadcast:new
+        └─ otherwise → end other live play, insert new play
+                     → started → emit broadcast:new + notifyRepeatListeners
 ```
 
-## 5. Nearby Feed (`app/nearby-feed.tsx`)
-
-This is the main screen. It ties together multiple systems:
+### On-repeat push (`services/pushService.ts`)
 
 ```
-Feed screen mounts
-  │
-  ├─ 1. Request GPS permission (→ /location-required if denied)
-  │
-  ├─ 2. Get current position
-  │
-  ├─ 3. Read discovery radius from SecureStore (default: 100m)
-  │
-  ├─ 4. POST /account/location { lat, lng } → update server-side location
-  │
-  ├─ 5. GET /feed/nearby?lat=X&lng=Y&radius=Z → fetch broadcasts
-  │
-  ├─ 6. Connect Socket.IO → listen for real-time updates
-  │     ├─ Send location:update event
-  │     ├─ On broadcast:new → add to list (if not duplicate)
-  │     └─ On broadcast:removed → remove from list
-  │
-  ├─ 7. Start client-side Spotify poller (every 10s)
-  │     └─ Checks currently playing → POST/DELETE /broadcasts
-  │
-  ├─ 8. Start background location tracking
-  │
-  ├─ 9. Register for push notifications
-  │
-  └─ 10. Set up HTTP poll interval (every 10s) to refresh feed
+On a started play P by listener L:
+  recipients = users with a push token
+             AND last location within 500m of P
+             AND P.track_id ∈ their user_repeat_tracks
+             AND ≠ L
+  claim (recipient, L, track) in push_notifications_sent ON CONFLICT DO NOTHING
+  → send Expo push only to the rows actually claimed (once per pair+track, ever)
 ```
 
-### Feed Data Flow (Server Side)
+## 7. Nearby Feed (`app/nearby-feed.tsx`)
+
+```
+Feed mounts
+  ├─ Connect socket
+  │     ├─ broadcast:new   → insert, or replace by ID (resumed plays come back live)
+  │     └─ broadcast:ended → mark isLive:false, endedAt:now
+  ├─ loadFeed() now and every 10s:
+  │     ├─ location (section 4)
+  │     ├─ radius from SecureStore `discovery_radius` (default 100m)
+  │     └─ GET /feed/nearby?lat&lng&radius
+  ├─ startPresence()  ·  startBackgroundLocation()  ·  registerForPushNotifications()
+  │
+  └─ Render
+        ├─ FeedHeader: newest live play's art, blurred + darkened
+        │     "nearby" · "N playing now · M earlier" · people / you · list / map
+        ├─ list: SectionList of PLAYING NOW, then EARLIER (empty sections hidden)
+        │     └─ BroadcastCard: art, track, artist, live dot / "12m ago",
+        │        "· 42% match", 5 reactions, comment / message
+        └─ map: FeedMap, dark style, bright pins live / darker pins earlier
+```
+
+### Server side
 
 ```
 GET /feed/nearby
-  │
   ├─ Validate lat/lng, clamp radius to [50, 500]
-  │
-  ├─ Query broadcasts within radius using PostGIS ST_DWithin
-  │     └─ Excludes requesting user's own broadcast
-  │
-  ├─ For each broadcast:
-  │     ├─ Compute tasteScore between requester and broadcaster
-  │     ├─ Fuzz location by 100-200m random offset (privacy)
-  │     └─ Strip userId from response (anonymity)
-  │
-  └─ Return { broadcasts: [...], count }
+  ├─ Plays within radius (ST_DWithin) that are live, or ended < 6h ago,
+  │   excluding the caller's own
+  ├─ ORDER BY live first, then started_at desc
+  ├─ Per play: tasteScore(caller, listener); strip userId
+  └─ { broadcasts: [...], count }   (exact locations; no fuzzing)
 ```
 
-### Feed View Modes
+## 8. Social Interactions
 
+The caller's anonymous ID always comes from their session on the server.
+The app never sends one.
+
+### Reactions (`BroadcastCard`)
 ```
-Nav bar: [List] [Map] [Connections] [👤]
-  │
-  ├─ List view (default)
-  │     └─ FlatList of BroadcastCard components
-  │
-  └─ Map view
-        └─ react-native-maps MapView with green pins
-             └─ Callout shows album art, track, artist
-```
-
-## 6. Broadcasting (How Music Gets Into the Feed)
-
-There are TWO parallel broadcast mechanisms:
-
-### Client-Side Poller (`src/services/spotifyPoller.ts`)
-
-```
-Runs when app is open (every 10s):
-  │
-  ├─ Fetch Spotify /v1/me/player/currently-playing
-  │
-  ├─ Playing? → Get GPS position → POST /broadcasts { track, location }
-  │
-  └─ Not playing? → DELETE /broadcasts (remove own broadcast)
+tap 🔥 ❤️ 🎧 👏 😮 → POST /social/reactions { broadcastId, type }
+  ├─ unique per (play, session, type)
+  ├─ → updated counts
+  └─ play expired → 404
 ```
 
-### Server-Side Poller (`server/services/spotifyPoller.ts`)
-
+### Comments (`/comment-thread?broadcastId=X`)
 ```
-Runs continuously on server (every 15s):
-  │
-  ├─ Query ALL users from DB
-  │
-  ├─ For each user with a last known location:
-  │     ├─ Refresh Spotify token if expired
-  │     ├─ Fetch currently playing from Spotify API
-  │     ├─ Playing → createBroadcast(userId, track, lastKnownLocation)
-  │     └─ Not playing → removeBroadcast(userId)
-  │
-  └─ This means users broadcast even when the app is closed,
-     as long as they have a stored location and are playing music
+GET  /social/comments/:broadcastId
+POST /social/comments { broadcastId, text }   (play expired → 404)
+Comments belong to the play and are deleted with it 6h after it ends.
 ```
 
-### Broadcast Creation (`services/broadcastService.ts`)
-
+### Direct messages (`/dm?recipientAnonId=X`)
 ```
-createBroadcast(userId, track, location)
-  │
-  ├─ Remove any existing broadcast for this user (upsert)
-  ├─ Generate random UUID as anonymous_id
-  ├─ Insert into broadcasts table with PostGIS geography point
-  └─ Return broadcast object (no userId exposed)
+GET  /social/dms/:recipientAnonId
+       └─ DMs between ANY of my session IDs and theirs; participants only
+POST /social/dms { recipientAnonId, text, includesConnectionRequest }
+       └─ recipient not addressable (session ended, no play in the 6h window) → 404
+"Mine" in the UI = anything the other side didn't send.
 ```
 
-### Real-Time Broadcast Push (`services/feedSocket.ts`)
+> Known gap: the "ask to connect" toggle only sets `includes_connection_request`
+> on the DM. It does **not** create a connection request (see section 9).
+
+## 9. Connection Lifecycle
+
+> Known gap: the server side below works and is tested, but the app never
+> calls `POST /connections/requests` (`sendConnectionRequest` in `api.ts` is
+> unused), and nothing links to `/connection-requests`. Today a request can
+> only be created through the API directly.
 
 ```
-When a broadcast is created:
-  │
-  ├─ emitBroadcastNew(io, broadcast)
-  │     └─ For each connected Socket.IO client:
-  │           ├─ Check if client location is within range (Haversine)
-  │           ├─ Skip if it's the broadcaster's own socket
-  │           └─ Emit 'broadcast:new' to qualifying clients
-  │
-  └─ sendPushToNearbyUsers(...)
-        └─ Query users within 500m with push tokens
-        └─ Send Expo push notifications in batches of 100
-```
+POST /connections/requests { broadcasterAnonId }
+  └─ resolve the anonymous ID → user (404 if not addressable) → pending, 24h expiry
 
-## 7. Social Interactions
+/connection-requests
+  ├─ incoming: GET /connections/requests/incoming
+  │     ├─ yes → POST /connections/requests/:id/accept  → connection created
+  │     └─ no  → POST /connections/requests/:id/decline
+  ├─ sent: GET /connections/requests/outgoing
+  │     └─ cancel → POST /connections/requests/:id/cancel
+  └─ not your request → 403 · not pending → 409 · auto-expire after 24h
 
-### Reactions (`BroadcastCard` → `POST /social/reactions`)
-
-```
-User taps emoji on a BroadcastCard
-  │
-  ├─ 5 types: 🔥 fire, ❤️ heart, 🎧 headphones, 👏 clap, 😮 surprised
-  │
-  ├─ POST /social/reactions { broadcastId, viewerAnonId, type }
-  │     └─ Upsert (unique per viewer+type via DB constraint)
-  │
-  └─ Returns updated reaction counts → displayed on card
-```
-
-### Comments (`app/comment-thread.tsx` → `CommentThread` component)
-
-```
-User taps "💬 Comments" on a BroadcastCard
-  │
-  ├─ Navigate to /comment-thread?broadcastId=X
-  │
-  ├─ GET /social/comments/:broadcastId → load existing comments
-  │
-  └─ POST /social/comments { broadcastId, authorAnonId, text }
-       └─ Comment stored with anonymous author ID
-```
-
-### Direct Messages (`app/dm.tsx` → `DMScreen` component)
-
-```
-User taps "✉️ Message" on a BroadcastCard
-  │
-  ├─ Navigate to /dm?recipientAnonId=X
-  │
-  ├─ GET /social/dms/:participantA/:participantB → load thread
-  │
-  └─ POST /social/dms { senderAnonId, recipientAnonId, text, includesConnectionRequest }
-       └─ Messages stored with anonymous IDs (identity hidden)
-```
-
-## 8. Connection Lifecycle
-
-### Sending a Request
-
-```
-User wants to connect with an anonymous broadcaster
-  │
-  ├─ POST /connections/requests { viewerUserId, broadcasterAnonId }
-  │
-  └─ Creates pending request with 24h expiry
-```
-
-### Receiving & Managing Requests (`app/connection-requests.tsx`)
-
-```
-GET /connections/requests/incoming/:userId → list pending requests
-  │
-  ├─ Accept → POST /connections/requests/:id/accept
-  │     ├─ Creates Connection record linking both users
-  │     ├─ Fetches Spotify profiles for both users
-  │     └─ Both users can now see each other's identity
-  │
-  ├─ Decline → POST /connections/requests/:id/decline
-  │
-  └─ Requests auto-expire after 24h (server scheduler)
-```
-
-### Connections List (`app/connections.tsx`)
-
-```
-GET /connections?userId=X
-  │
-  └─ Returns list of connected users with:
-       ├─ displayName (from Spotify)
-       ├─ profileImageUrl
-       └─ createdAt
-```
-
-### Connection Detail (`app/connection-detail.tsx`)
-
-```
-GET /connections/:id?userId=X
-  │
-  └─ Returns full Spotify profile:
-       ├─ displayName, profileImageUrl, profileLink
-       ├─ topArtists
-       └─ topTracks
-```
-
-### Removing a Connection
-
-```
-DELETE /connections/:id?userId=X
-  │
-  └─ Deletes connection record
-       └─ Future interactions return to anonymous
-```
-
-## 9. Music Taste Matching
-
-```
-On login → syncUserTaste(userId, accessToken)
-  │
-  ├─ Fetch top 20 artists from Spotify /v1/me/top/artists
-  ├─ Fetch top 20 tracks from Spotify /v1/me/top/tracks
-  └─ Store in user_top_artists / user_top_tracks tables
-
-On feed load → getTasteScore(userA, userB)
-  │
-  ├─ Count shared artists (case-insensitive) → 3 pts each (max 60)
-  ├─ Count shared tracks (case-insensitive) → 2 pts each (max 40)
-  └─ Total score: 0–100, displayed as "X% match" badge on BroadcastCard
+/connections        GET /connections        → name, image, connected date
+/connection-detail  GET /connections/:id    → profile, top artists, top tracks
+                                              (profile data is still a placeholder)
+remove              DELETE /connections/:id → anonymous again
 ```
 
 ## 10. Profile & Settings (`app/profile.tsx`)
 
 ```
-Profile screen:
-  │
-  ├─ Fetches Spotify /v1/me → display name + email
-  │
-  ├─ Discovery Radius slider (50m–500m, stored in SecureStore)
-  │     └─ Read by feed screen on each load
-  │
-  ├─ "Log Out" → clear tokens from SecureStore → redirect to /
-  │
-  └─ "Delete Account" → confirmation dialog
-       ├─ DELETE /account/:userId on server
-       │     └─ Cascades: broadcasts, reactions, comments, DMs,
-       │        connection_requests, connections, user_settings
-       ├─ Clear local tokens + onboarding state
-       └─ Redirect to /
+"you are" <spotify display name> · email
+Discovery radius slider 50–500m → SecureStore `discovery_radius`
+"log out" → clear tokens → /
+"delete account and all data" → confirm
+     ├─ DELETE /account/me  (always the caller's account)
+     │     └─ delete DMs from every session ID → delete user (cascades the rest)
+     └─ clear tokens + onboarding → /
 ```
 
-## 11. Server Scheduled Tasks (`scheduler.ts`)
+## 11. Scheduled Tasks (`scheduler.ts`)
 
 ```
-On server boot:
-  │
-  ├─ Every 30s → expireStaleBroadcasts()
-  │     └─ Delete broadcasts older than 30s (user stopped playing)
-  │
-  └─ Every 60s → expireStaleRequests()
-        └─ Mark pending connection requests as 'expired' if >24h old
+every 30s  endStalePlays        live, not seen for 60s → ended at last_seen_at
+every 30s  expireOldPlays       ended > 6h ago → deleted (+ reactions, comments)
+every 60s  expireStaleRequests  pending > 24h → expired
+every 60s  endIdleSessions      section 5 rule
 ```
 
 ## 12. Privacy & Cleanup
 
 ```
-Socket disconnect → cleanupSessionData(userId)
-  └─ Delete user's broadcast (removes location data)
-
-Account deletion → deleteAccount(userId)
-  ├─ Collect anonymous IDs from user's broadcasts
-  ├─ Delete DMs referencing those anonymous IDs
-  └─ Delete user row (cascades everything else)
-
-Location fuzzing (on every feed response):
-  └─ Add random 100-200m offset in random direction
-     └─ Prevents pinpointing exact user location
+Anonymity       a session's random ID, assigned by the server; userId is never sent
+Location        exact (decision 2026-10-21); deleted with the play 6h after it ends
+Socket close    forgets the subscription only; plays outlive sockets
+Account delete  DMs for all session IDs, then the user row (cascade)
 ```
 
 ---
 
-## System Architecture Diagram
+## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        MOBILE APP                               │
-│                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │ Spotify  │  │   GPS    │  │  Feed    │  │  Background   │  │
-│  │ Auth     │  │  Module  │  │  Socket  │  │  Location     │  │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └───────┬───────┘  │
-│       │              │             │                 │          │
-│       │         ┌────┴─────┐      │                 │          │
-│       │         │ Spotify  │      │                 │          │
-│       │         │ Poller   │      │                 │          │
-│       │         └────┬─────┘      │                 │          │
-│       │              │             │                 │          │
-│  ┌────┴──────────────┴─────────────┴─────────────────┴───────┐ │
-│  │                    API Client (api.ts)                     │ │
-│  │              authFetch() — injects Bearer token            │ │
-│  └────────────────────────────┬───────────────────────────────┘ │
-└───────────────────────────────┼─────────────────────────────────┘
-                                │
-                    HTTP + WebSocket (Socket.IO)
-                                │
-┌───────────────────────────────┼─────────────────────────────────┐
-│                        SERVER                                    │
+┌──────────────────────────────────────────────────────────────────┐
+│                          MOBILE APP                              │
+│  Spotify Auth · GPS · Background Location · Presence · Socket    │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │              API client (api.ts, Bearer token)             │  │
+│  └─────────────────────────────┬──────────────────────────────┘  │
+└────────────────────────────────┼─────────────────────────────────┘
+                     HTTP + WebSocket (Socket.IO)
+┌────────────────────────────────┼─────────────────────────────────┐
+│                           SERVER                                 │
+│  Routes:   auth · feed · social · connections · account          │
+│  Services: sessionService · broadcastService · spotifyPoller     │
+│            pushService · tasteService · socialService            │
+│            connectionService · privacyService · feedSocket       │
+│                               │                                  │
+│                  PostgreSQL + PostGIS                            │
 │                                                                  │
-│  ┌──────────┐  ┌──────────────┐  ┌────────────┐  ┌───────────┐ │
-│  │  Auth    │  │  Feed        │  │  Social    │  │ Broadcast │ │
-│  │  Routes  │  │  Routes      │  │  Routes    │  │ Routes    │ │
-│  └────┬─────┘  └──────┬───────┘  └─────┬──────┘  └─────┬─────┘ │
-│       │               │                │                │       │
-│  ┌────┴───────────────┴────────────────┴────────────────┴────┐  │
-│  │                     Services Layer                         │  │
-│  │  broadcastService │ socialService │ connectionService     │  │
-│  │  tasteService     │ privacyService│ proximityService      │  │
-│  │  spotifyPoller    │ feedSocket    │ pushService            │  │
-│  └────────────────────────┬──────────────────────────────────┘  │
-│                           │                                      │
-│              ┌────────────┴────────────┐                        │
-│              │    PostgreSQL + PostGIS  │                        │
-│              │    Redis (cache/pubsub) │                        │
-│              └─────────────────────────┘                        │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Scheduler: expire broadcasts (30s) + requests (60s)     │   │
-│  │  Spotify Poller: poll all users every 15s                 │   │
-│  └──────────────────────────────────────────────────────────┘   │
+│  Spotify poller   every 15s, all users → plays                   │
+│  Scheduler        stale plays · 6h expiry · requests · sessions  │
 └──────────────────────────────────────────────────────────────────┘
+          Spotify Web API  ◀── poller, auth, taste/repeat sync
+          Expo Push API    ◀── on-repeat notifications
 ```
 
 ## Screen Navigation Map
@@ -486,23 +304,18 @@ Location fuzzing (on every feed response):
 /onboarding ──▶ / (login)
                   │
                   ▼
-            /nearby-feed ◀──────────────────────┐
-              │   │   │                          │
-              │   │   ├──▶ /comment-thread       │
-              │   │   │      ?broadcastId=X      │
-              │   │   │                          │
-              │   │   ├──▶ /dm                   │
-              │   │   │      ?recipientAnonId=X  │
-              │   │   │                          │
-              │   │   └──▶ /profile ─────────────┘
-              │   │          ├─ Logout → /
-              │   │          └─ Delete Account → /
+            /nearby-feed ◀────────────────────────┐
+              │   │   │                            │
+              │   │   ├──▶ /comment-thread?broadcastId=X
+              │   │   ├──▶ /dm?recipientAnonId=X   │
+              │   │   └──▶ /profile ("you") ───────┘
+              │   │          ├─ log out → /
+              │   │          └─ delete account → /
               │   │
-              │   └──▶ /connections
-              │          │
-              │          └──▶ /connection-detail
-              │                 ?connectionId=X
+              │   └──▶ /connections ("people")
+              │          └──▶ /connection-detail?connectionId=X
               │
-              └──▶ /location-required
-                     (if GPS denied)
+              └──▶ /location-required  (permission not granted)
+
+/connection-requests   registered, but no in-app link to it yet
 ```
