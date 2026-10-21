@@ -169,9 +169,13 @@ Tab group mounts (NearbyFeedProvider)
   └─ Render
         ├─ nearby tab: FeedHeader (newest live art, blurred; "N playing now · M earlier")
         │     └─ SectionList of PLAYING NOW, then EARLIER (empty sections hidden)
-        │          └─ BroadcastCard: art, track, artist, live dot / "12m ago",
-        │             "· 42% match", 5 reactions, comment / message
-        └─ map tab: same header + FeedMap (dark style, bright pins live / darker earlier)
+        │          └─ BroadcastRow on hairlines: art, track, "artist · ● now" / "· 39m",
+        │             "· 42%" match. Tap → /play (the play is handed over in memory,
+        │             not via URL params, so titles like "Pink + White" survive)
+        └─ map tab: same header + FeedMap
+              ├─ muted dark Apple map, no POIs/buildings, sky-tinted by a translucent overlay
+              ├─ pins = album art in circles: live larger + sky ring + pulse, earlier smaller + dimmed
+              └─ tap a pin → /play (same as a feed row)
 ```
 
 ### Server side
@@ -191,15 +195,24 @@ GET /feed/nearby
 The caller's anonymous ID always comes from their session on the server.
 The app never sends one.
 
-### Reactions (`BroadcastCard`)
+### Play screen (`/play?broadcastId=X`)
 ```
-tap 🔥 ❤️ 🎧 👏 😮 → POST /social/reactions { broadcastId, type }
+big art · track · artist · live / "played 39m ago" · match
+reactions · "message the listener" (→ /dm) · COMMENTS thread + composer
+Opened without the feed (deep link) → comments only
+```
+
+### Reactions (`Reactions.tsx`, on the play screen)
+```
+tap fire · love · same · yes · new to me
+  (server types: fire, heart, headphones, clap, surprised)
+  → POST /social/reactions { broadcastId, type }
   ├─ unique per (play, session, type)
   ├─ → updated counts
   └─ play expired → 404
 ```
 
-### Comments (`/comment-thread?broadcastId=X`)
+### Comments (on the play screen)
 ```
 GET  /social/comments/:broadcastId
 POST /social/comments { broadcastId, text }   (play expired → 404)
@@ -230,7 +243,8 @@ In a DM: toggle "ask to connect" → send
     └─ save the DM, flagged
   (POST /connections/requests { broadcasterAnonId } does the same without a DM)
 
-/connections ("people") → "requests · N waiting" card (refetched on focus)
+/connections ("people") → one line: "● N requests waiting →", or a dim "requests →"
+                          (refetched on focus); connections as rows with letter avatars
 
 /connection-requests
   ├─ incoming: GET /connections/requests/incoming
@@ -315,7 +329,7 @@ Account delete  DMs for all session IDs, then the user row (cascade)
                                 │  feed    │      │              │            │
                                 └────┬─────┴──────┴──────┬───────┴─────┬──────┘
                                      │                   │             ├─ log out → /
-       /comment-thread?broadcastId=X ◀┤                   │             └─ delete account → /
+       /play?broadcastId=X           ◀┤                   │             └─ delete account → /
        /dm?recipientAnonId=X         ◀┘                   │
                          /connection-requests ("requests" card) ◀┤
                          /connection-detail?connectionId=X       ◀┘

@@ -1,10 +1,11 @@
 import { View, Text, SectionList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import BroadcastCard from '../../src/components/BroadcastCard';
+import BroadcastRow from '../../src/components/BroadcastRow';
+import type { FeedBroadcast } from '../../src/services/api';
 import FeedHeader from '../../src/components/FeedHeader';
 import { SectionLabel, COLORS } from '../../src/components/ui';
-import { useNearbyFeed } from '../../src/services/nearbyFeed';
+import { useNearbyFeed, rememberPlay } from '../../src/services/nearbyFeed';
 
 export default function NearbyFeedScreen() {
   const router = useRouter();
@@ -12,6 +13,11 @@ export default function NearbyFeedScreen() {
   const { broadcasts, loading, error, reload } = useNearbyFeed();
 
   const live = broadcasts.filter((b) => b.isLive);
+
+  const openPlay = (b: FeedBroadcast) => {
+    rememberPlay(b);
+    router.push(`/play?broadcastId=${b.id}`);
+  };
   const earlier = broadcasts.filter((b) => !b.isLive);
 
   const header = (
@@ -77,13 +83,8 @@ export default function NearbyFeedScreen() {
           renderSectionHeader={({ section }) => (
             <SectionLabel title={section.title} className="px-6 pt-5 pb-2 bg-ground" />
           )}
-          renderItem={({ item }) => (
-            <BroadcastCard
-              broadcast={item}
-              onOpenComments={(id) => router.push(`/comment-thread?broadcastId=${id}`)}
-              onOpenDM={(anonId) => router.push(`/dm?recipientAnonId=${anonId}`)}
-            />
-          )}
+          renderItem={({ item }) => <BroadcastRow broadcast={item} onOpen={openPlay} />}
+          ItemSeparatorComponent={() => <View className="h-px bg-rule ml-[88px] mr-6" />}
           contentContainerStyle={{ paddingBottom: 16 }}
           stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}

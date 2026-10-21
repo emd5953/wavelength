@@ -4,7 +4,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, type ViewProps } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, type ViewProps } from 'react-native';
 
 // Raw values for props that don't take classNames (spinners, switches, sliders).
 export const COLORS = {
@@ -30,6 +30,23 @@ export function PageTitle({ title, subtitle, topInset }: { title: string; subtit
     <View style={{ paddingTop: topInset + 12 }} className="px-6 pb-4">
       <Text className="font-mono-light text-[32px] text-ink">{title}</Text>
       {subtitle ? <Text className="font-mono text-[13px] text-ink-dim mt-1">{subtitle}</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * Profile picture, or the first letter of the name in a hairline circle when
+ * there's no real image (the server's placeholder URLs count as none).
+ */
+export function Avatar({ uri, name, size }: { uri?: string; name: string; size: number }) {
+  const hasImage = !!uri && !uri.includes('placeholder');
+  const style = { width: size, height: size, borderRadius: size / 2 };
+  if (hasImage) return <Image source={{ uri }} style={style} className="bg-card" accessibilityLabel={`${name} profile image`} />;
+  return (
+    <View style={style} className="items-center justify-center border border-rule">
+      <Text className="font-mono-light text-ink-muted" style={{ fontSize: size * 0.42 }}>
+        {(name.trim()[0] ?? '·').toLowerCase()}
+      </Text>
     </View>
   );
 }

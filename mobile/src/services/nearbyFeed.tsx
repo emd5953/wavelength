@@ -34,6 +34,19 @@ interface NearbyFeed {
 
 const NearbyFeedContext = createContext<NearbyFeed | null>(null);
 
+// The play screen sits outside the tab group (and its provider), so the feed
+// hands the tapped play over here instead of through URL params, which mangle
+// titles like "Pink + White".
+const openedPlays = new Map<string, FeedBroadcast>();
+
+export function rememberPlay(play: FeedBroadcast): void {
+  openedPlays.set(play.id, play);
+}
+
+export function getRememberedPlay(id: string): FeedBroadcast | undefined {
+  return openedPlays.get(id);
+}
+
 export function NearbyFeedProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [broadcasts, setBroadcasts] = useState<FeedBroadcast[]>([]);

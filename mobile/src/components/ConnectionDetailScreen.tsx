@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Image, ScrollView, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, Linking, Alert } from 'react-native';
 import { getConnectionDetail, removeConnection } from '../services/api';
 import type { ConnectionDetailData } from '../services/api';
-import { Screen, SectionLabel, EmptyState, PrimaryButton, TextButton, Spinner } from './ui';
+import { Screen, SectionLabel, EmptyState, PrimaryButton, TextButton, Spinner, Avatar } from './ui';
 
 interface ConnectionDetailScreenProps {
   connectionId: string;
@@ -99,11 +99,7 @@ export default function ConnectionDetailScreen({
     <Screen>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}>
         <View className="items-center pt-8">
-          <Image
-            source={{ uri: profile.profileImageUrl }}
-            className="w-24 h-24 rounded-full bg-card border border-rule"
-            accessibilityLabel={`${profile.displayName} profile image`}
-          />
+          <Avatar uri={profile.profileImageUrl} name={profile.displayName} size={96} />
           <Text className="font-mono text-[13px] text-ink-dim mt-6">you're connected with</Text>
           <Text className="font-mono-light text-[30px] text-ink mt-1 text-center">
             {profile.displayName.toLowerCase()}

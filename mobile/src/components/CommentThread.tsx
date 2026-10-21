@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useState, type ReactElement } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, Text } from 'react-native';
 import { getComments, addComment } from '../services/api';
 import type { Comment } from '../services/api';
 import { Bubble, BubbleText, Composer } from './Conversation';
@@ -8,9 +8,11 @@ import { EmptyState } from './ui';
 interface CommentThreadProps {
   broadcastId: string;
   viewerAnonId: string;
+  /** Rendered above the comments and scrolls with them (the play screen's song details). */
+  header?: ReactElement;
 }
 
-export default function CommentThread({ broadcastId, viewerAnonId }: CommentThreadProps) {
+export default function CommentThread({ broadcastId, viewerAnonId, header }: CommentThreadProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -49,7 +51,16 @@ export default function CommentThread({ broadcastId, viewerAnonId }: CommentThre
             <BubbleText text={item.text} />
           </Bubble>
         )}
-        ListEmptyComponent={<EmptyState title="no comments yet." body="say what this song makes you think of." />}
+        ListHeaderComponent={header}
+        ListEmptyComponent={
+          header ? (
+            <Text className="font-mono text-[13px] text-ink-dim px-6 py-2">
+              no comments yet. say what this song makes you think of.
+            </Text>
+          ) : (
+            <EmptyState title="no comments yet." body="say what this song makes you think of." />
+          )
+        }
         contentContainerStyle={{ paddingVertical: 12 }}
       />
       <Composer

@@ -2,10 +2,12 @@ import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FeedHeader from '../../src/components/FeedHeader';
 import FeedMap from '../../src/components/FeedMap';
-import { useNearbyFeed } from '../../src/services/nearbyFeed';
+import { useRouter } from 'expo-router';
+import { useNearbyFeed, rememberPlay } from '../../src/services/nearbyFeed';
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { broadcasts, userLocation } = useNearbyFeed();
   const live = broadcasts.filter((b) => b.isLive);
 
@@ -18,7 +20,14 @@ export default function MapScreen() {
         liveCount={live.length}
         earlierCount={broadcasts.length - live.length}
       />
-      <FeedMap broadcasts={broadcasts} userLocation={userLocation} />
+      <FeedMap
+        broadcasts={broadcasts}
+        userLocation={userLocation}
+        onOpenPlay={(play) => {
+          rememberPlay(play);
+          router.push(`/play?broadcastId=${play.id}`);
+        }}
+      />
     </View>
   );
 }

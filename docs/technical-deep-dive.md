@@ -239,7 +239,8 @@ mobile/
 │   │   ├── map.tsx             # map: same plays as pins
 │   │   ├── connections.tsx     # people: requests card + connections
 │   │   └── profile.tsx         # you: radius slider, log out, delete account
-│   ├── comment-thread.tsx · dm.tsx
+│   ├── play.tsx                # One play: big art, reactions, message, comments
+│   ├── dm.tsx
 │   ├── connection-detail.tsx · connection-requests.tsx
 │   └── location-required.tsx
 ├── assets/fonts/paper-mono/    # Paper Mono, SIL OFL 1.1
@@ -248,7 +249,9 @@ mobile/
     │   ├── ui.tsx              # Design-system primitives + COLORS
     │   ├── Conversation.tsx    # Bubbles + composer (comments, DMs)
     │   ├── FeedHeader.tsx      # Blurred-art header with title and live/earlier counts
-    │   ├── BroadcastCard.tsx · FeedMap.tsx
+    │   ├── BroadcastRow.tsx    # Minimal feed row; tapping opens /play
+    │   ├── Reactions.tsx       # Word pills: fire · love · same · yes · new to me
+    │   ├── FeedMap.tsx         # Muted, sky-tinted map; album-art pins that open /play
     │   └── Connection*Screen.tsx · CommentThread.tsx · DMScreen.tsx
     ├── config/spotify.ts       # OAuth config
     └── services/
@@ -297,8 +300,9 @@ Sky palette and Paper Mono. The reasoning is in
   `font-mono-semibold`, one family per weight because React Native can't
   synthesize weights for custom fonts. Copy is lowercase; section labels are
   tracked uppercase on hairlines.
-- **Rules:** no shadows, no emoji except the reactions, one filled
+- **Rules:** no shadows, no emoji (reactions are words), one filled
   (`primary`) action per screen, and album art as the only source of color.
+  The feed is plain rows on hairlines; actions live on the play screen.
 - NativeWind only applies `className` to components it knows about.
   Third-party components (like `LinearGradient`) need `cssInterop` in
   `_layout.tsx`.

@@ -42,7 +42,7 @@ export default function RootLayout() {
       <Stack.Screen name="onboarding" options={{ title: 'Welcome', headerShown: false }} />
       <Stack.Screen name="index" options={{ title: 'Wavelength', headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="comment-thread" options={{ title: 'comments' }} />
+      <Stack.Screen name="play" options={{ title: '' }} />
       <Stack.Screen name="dm" options={{ title: 'message' }} />
       <Stack.Screen name="connection-detail" options={{ title: 'profile' }} />
       <Stack.Screen name="connection-requests" options={{ title: 'requests' }} />

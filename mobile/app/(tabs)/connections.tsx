@@ -20,7 +20,7 @@ export default function ConnectionsRoute() {
 
   return (
     <Screen>
-      <PageTitle title="people" subtitle="who you've connected with" topInset={insets.top} />
+      <PageTitle title="people" topInset={insets.top} />
       <ConnectionsListScreen
         userId={userId}
         onSelectConnection={(connectionId) =>
