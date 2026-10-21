@@ -83,3 +83,52 @@ export async function getTasteScore(userA: string, userB: string): Promise<numbe
     return 0;
   }
 }
+
+/** Repeat tracks older than this are re-synced by the poller. */
+export const REPEAT_SYNC_MAX_AGE_HOURS = 24;
+
+/**
+ * Sync a user's "on repeat" tracks: Spotify's short_term top tracks (roughly
+ * the last 4 weeks). Spotify's own On Repeat playlist isn't readable through
+ * the API, so this is the closest signal. On any failure the previous rows are
+ * kept.
+ */
+export async function syncRepeatTracks(userId: string, accessToken: string): Promise<void> {
+  try {
+    const res = await fetch('https://api.spotify.com/v1/me/top/tracks?limit=50&time_range=short_term', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return;
+
+    const data = (await res.json()) as SpotifyTopTracksResponse;
+    const trackIds = data.items.map((t) => t.id);
+    const ranks = trackIds.map((_, i) => i + 1);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM user_repeat_tracks WHERE user_id = $1', [userId]);
+      await client.query(
+        `INSERT INTO user_repeat_tracks (user_id, track_id, rank)
+         SELECT $1, t.track_id, t.rank
+         FROM unnest($2::text[], $3::int[]) AS t(track_id, rank)
+         ON CONFLICT (user_id, track_id) DO NOTHING`,
+        [userId, trackIds, ranks],
+      );
+      await client.query('UPDATE users SET repeat_tracks_synced_at = NOW() WHERE id = $1', [userId]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error(`Repeat track sync error for user ${userId}:`, err);
+  }
+}
+
+/** Whether a user's repeat tracks were never synced or are older than REPEAT_SYNC_MAX_AGE_HOURS. */
+export function repeatTracksStale(syncedAt: Date | null): boolean {
+  return !syncedAt || Date.now() - syncedAt.getTime() > REPEAT_SYNC_MAX_AGE_HOURS * 60 * 60 * 1000;
+}

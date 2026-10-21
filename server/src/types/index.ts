@@ -19,16 +19,23 @@ export interface GeoPosition {
   timestamp: number;
 }
 
+/**
+ * A play: one track played by one listener at one place. The anonymous id is
+ * the listener's session id, shared by every play in that session.
+ */
 export interface Broadcast {
   id: string;
   userId?: string;
   anonymousId: string;
+  trackId: string;
   trackTitle: string;
   artistName: string;
   albumArtUrl: string;
   startedAt: number;
   location: GeoPosition;
   createdAt: number;
+  isLive: boolean;
+  endedAt: number | null;
 }
 
 export interface Comment {

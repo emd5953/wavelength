@@ -128,22 +128,26 @@ export async function sendDM(
 }
 
 /**
- * Get DM thread between two anonymous participants, ordered chronologically.
+ * Get the DM thread between the caller and another anonymous participant,
+ * across every session the caller has held. The caller is identified by user
+ * id, so only participants can ever read a thread.
  * Requirement 5.4: keep identities hidden unless connected.
  */
 export async function getDMThread(
-  participantA: string,
-  participantB: string,
+  userId: string,
+  otherAnonId: string,
 ): Promise<DM[]> {
   const result = await pool.query(
     `SELECT id, sender_anon_id AS "senderAnonId", recipient_anon_id AS "recipientAnonId",
             text, includes_connection_request AS "includesConnectionRequest",
             EXTRACT(EPOCH FROM created_at) * 1000 AS "createdAt"
      FROM direct_messages
-     WHERE (sender_anon_id = $1 AND recipient_anon_id = $2)
-        OR (sender_anon_id = $2 AND recipient_anon_id = $1)
+     WHERE (sender_anon_id IN (SELECT anonymous_id FROM listening_sessions WHERE user_id = $1)
+            AND recipient_anon_id = $2)
+        OR (sender_anon_id = $2
+            AND recipient_anon_id IN (SELECT anonymous_id FROM listening_sessions WHERE user_id = $1))
      ORDER BY created_at ASC`,
-    [participantA, participantB],
+    [userId, otherAnonId],
   );
 
   return result.rows.map((row: Record<string, unknown>) => ({

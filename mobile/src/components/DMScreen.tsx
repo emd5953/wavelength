@@ -4,27 +4,26 @@ import { getDMThread, sendDM } from '../services/api';
 import type { DMMessage } from '../services/api';
 
 interface DMScreenProps {
-  myAnonId: string;
   recipientAnonId: string;
 }
 
-export default function DMScreen({ myAnonId, recipientAnonId }: DMScreenProps) {
+export default function DMScreen({ recipientAnonId }: DMScreenProps) {
   const [messages, setMessages] = useState<DMMessage[]>([]);
   const [text, setText] = useState('');
   const [includeConnectionReq, setIncludeConnectionReq] = useState(false);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    getDMThread(myAnonId, recipientAnonId)
+    getDMThread(recipientAnonId)
       .then((res) => setMessages(res.messages))
       .catch(() => {});
-  }, [myAnonId, recipientAnonId]);
+  }, [recipientAnonId]);
 
   const handleSend = async () => {
     if (!text.trim() || sending) return;
     setSending(true);
     try {
-      const res = await sendDM(myAnonId, recipientAnonId, text.trim(), includeConnectionReq);
+      const res = await sendDM(recipientAnonId, text.trim(), includeConnectionReq);
       setMessages((prev) => [...prev, res.dm]);
       setText('');
       setIncludeConnectionReq(false);
@@ -46,7 +45,8 @@ export default function DMScreen({ myAnonId, recipientAnonId }: DMScreenProps) {
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          const isMe = item.senderAnonId === myAnonId;
+          // A thread spans all of my sessions, so "mine" is anything the other side didn't send
+          const isMe = item.senderAnonId !== recipientAnonId;
           return (
             <View className={`mx-4 my-1 ${isMe ? 'items-end' : 'items-start'}`}>
               <View

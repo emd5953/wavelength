@@ -41,14 +41,18 @@ async function insertUser(label: string): Promise<string> {
   return res.rows[0].id;
 }
 
-/** Insert a live broadcast and return its anonymous id, as the feed would expose it. */
+/** Open a session with a live play and return its anonymous id, as the feed would expose it. */
 async function insertBroadcast(userId: string, label: string): Promise<string> {
   const anonymousId = `${TAG}-anon-${label}`;
+  const session = await pool.query(
+    `INSERT INTO listening_sessions (user_id, anonymous_id) VALUES ($1, $2) RETURNING id`,
+    [userId, anonymousId],
+  );
   await pool.query(
-    `INSERT INTO broadcasts (user_id, anonymous_id, track_title, artist_name, album_art_url, location, started_at)
-     VALUES ($1, $2, 'Teardrop', 'Massive Attack', 'https://example.test/a.png',
+    `INSERT INTO broadcasts (user_id, session_id, track_id, track_title, artist_name, album_art_url, location, started_at)
+     VALUES ($1, $2, 'teardrop', 'Teardrop', 'Massive Attack', 'https://example.test/a.png',
              ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, NOW())`,
-    [userId, anonymousId, ORIGIN.longitude, ORIGIN.latitude],
+    [userId, session.rows[0].id, ORIGIN.longitude, ORIGIN.latitude],
   );
   return anonymousId;
 }
@@ -82,15 +86,26 @@ async function pair() {
 // ============================================================
 
 describe('resolveAnonId', () => {
-  it('resolves a live broadcast anon id to its broadcaster', async () => {
+  it('resolves a session anon id to its listener', async () => {
     const { broadcaster, anonId } = await pair();
 
     await expect(resolveAnonId(anonId)).resolves.toBe(broadcaster);
   });
 
-  it('returns null once the broadcast has ended', async () => {
+  it('still resolves after the session ends, while a play is in the feed', async () => {
+    const { broadcaster, anonId } = await pair();
+    await pool.query('UPDATE listening_sessions SET ended_at = NOW() WHERE anonymous_id = $1', [anonId]);
+
+    await expect(resolveAnonId(anonId)).resolves.toBe(broadcaster);
+  });
+
+  it('returns null once the session has ended and its plays have expired', async () => {
     const { anonId } = await pair();
-    await pool.query('DELETE FROM broadcasts WHERE anonymous_id = $1', [anonId]);
+    await pool.query('UPDATE listening_sessions SET ended_at = NOW() WHERE anonymous_id = $1', [anonId]);
+    await pool.query(
+      'DELETE FROM broadcasts WHERE session_id = (SELECT id FROM listening_sessions WHERE anonymous_id = $1)',
+      [anonId],
+    );
 
     await expect(resolveAnonId(anonId)).resolves.toBeNull();
   });

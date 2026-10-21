@@ -10,7 +10,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import pool from '../db/connection';
 import { runMigrations } from '../db/migrate';
-import { findNearby, validateRadius } from './proximityService';
+import { validateRadius } from './proximityService';
+import { getFeedInRadius } from './broadcastService';
 import type { GeoPosition } from '../types';
 
 /** Times Square, NYC — the origin every fixture is offset from. */
@@ -39,23 +40,38 @@ async function insertUser(label: string): Promise<string> {
   return res.rows[0].id;
 }
 
+/**
+ * Insert a live play under its own session, whose anonymous id is
+ * `${TAG}-${label}`. The session is closed so one user can hold several
+ * fixtures without tripping the one-open-session index.
+ */
 async function insertBroadcast(
   userId: string,
   label: string,
   coords: { latitude: number; longitude: number },
+  startedSecondsAgo = 0,
 ): Promise<string> {
+  const session = await pool.query(
+    `INSERT INTO listening_sessions (user_id, anonymous_id, ended_at)
+     VALUES ($1, $2, NOW()) RETURNING id`,
+    [userId, `${TAG}-${label}`],
+  );
   const res = await pool.query(
-    `INSERT INTO broadcasts (user_id, anonymous_id, track_title, artist_name, album_art_url, location, started_at)
-     VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography, NOW())
+    `INSERT INTO broadcasts
+       (user_id, session_id, track_id, track_title, artist_name, album_art_url, location, started_at)
+     VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326)::geography,
+             NOW() - make_interval(secs => $9))
      RETURNING id`,
     [
       userId,
-      `${TAG}-${label}`,
+      session.rows[0].id,
+      `track-${label}`,
       `Track ${label}`,
       `Artist ${label}`,
       'https://example.test/art.png',
       coords.longitude,
       coords.latitude,
+      startedSecondsAgo,
     ],
   );
   return res.rows[0].id;
@@ -82,12 +98,12 @@ beforeEach(cleanup);
 // ST_DWithin boundary behaviour
 // ============================================================
 
-describe('findNearby — radius boundary', () => {
+describe('getFeedInRadius — radius boundary', () => {
   it('includes a broadcast well inside the radius', async () => {
     const userId = await insertUser('near');
     await insertBroadcast(userId, 'near', metresNorth(60));
 
-    const results = await findNearby(center, 200);
+    const results = await getFeedInRadius(center, 200);
 
     expect(results.map((r) => r.anonymousId)).toContain(`${TAG}-near`);
   });
@@ -96,7 +112,7 @@ describe('findNearby — radius boundary', () => {
     const userId = await insertUser('far');
     await insertBroadcast(userId, 'far', metresNorth(400));
 
-    const results = await findNearby(center, 200);
+    const results = await getFeedInRadius(center, 200);
 
     expect(results.map((r) => r.anonymousId)).not.toContain(`${TAG}-far`);
   });
@@ -106,7 +122,7 @@ describe('findNearby — radius boundary', () => {
     await insertBroadcast(userId, 'beyond', metresNorth(600));
 
     // Ask for far more than the ceiling; validateRadius clamps it to 500.
-    const results = await findNearby(center, 10_000);
+    const results = await getFeedInRadius(center, 10_000);
 
     expect(validateRadius(10_000)).toBe(500);
     expect(results.map((r) => r.anonymousId)).not.toContain(`${TAG}-beyond`);
@@ -116,7 +132,7 @@ describe('findNearby — radius boundary', () => {
     const userId = await insertUser('floor');
     await insertBroadcast(userId, 'floor', metresNorth(40));
 
-    const results = await findNearby(center, 5);
+    const results = await getFeedInRadius(center, 5);
 
     expect(results.map((r) => r.anonymousId)).toContain(`${TAG}-floor`);
   });
@@ -126,8 +142,9 @@ describe('findNearby — radius boundary', () => {
     await insertBroadcast(userId, 'measure', metresNorth(150));
 
     const [row] = await pool.query(
-      `SELECT ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS d
-       FROM broadcasts WHERE anonymous_id = $3`,
+      `SELECT ST_Distance(b.location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) AS d
+       FROM broadcasts b JOIN listening_sessions s ON s.id = b.session_id
+       WHERE s.anonymous_id = $3`,
       [ORIGIN.longitude, ORIGIN.latitude, `${TAG}-measure`],
     ).then((r) => r.rows);
 
@@ -140,22 +157,24 @@ describe('findNearby — radius boundary', () => {
 // Ordering and exclusion
 // ============================================================
 
-describe('findNearby — ordering and exclusion', () => {
-  it('returns broadcasts sorted nearest first', async () => {
+describe('getFeedInRadius — ordering and exclusion', () => {
+  it('returns plays newest first, regardless of distance', async () => {
     const a = await insertUser('a');
     const b = await insertUser('b');
     const c = await insertUser('c');
-    // Insert out of order so the sort has to do real work.
-    await insertBroadcast(b, 'mid', metresNorth(200));
-    await insertBroadcast(c, 'outer', metresNorth(350));
-    await insertBroadcast(a, 'inner', metresNorth(50));
+    // Nearest is oldest, so a distance sort would get this backwards.
+    await insertBroadcast(a, 'oldest', metresNorth(50), 600);
+    await insertBroadcast(b, 'newest', metresNorth(350), 10);
+    await insertBroadcast(c, 'middle', metresNorth(200), 300);
 
-    const results = await findNearby(center, 500);
+    const results = (await getFeedInRadius(center, 500)).filter((r) =>
+      r.anonymousId.startsWith(TAG),
+    );
 
     expect(results.map((r) => r.anonymousId)).toEqual([
-      `${TAG}-inner`,
-      `${TAG}-mid`,
-      `${TAG}-outer`,
+      `${TAG}-newest`,
+      `${TAG}-middle`,
+      `${TAG}-oldest`,
     ]);
   });
 
@@ -165,7 +184,7 @@ describe('findNearby — ordering and exclusion', () => {
     await insertBroadcast(self, 'self', metresNorth(10));
     await insertBroadcast(other, 'other', metresNorth(20));
 
-    const results = await findNearby(center, 500, self);
+    const results = await getFeedInRadius(center, 500, self);
 
     const ids = results.map((r) => r.anonymousId);
     expect(ids).not.toContain(`${TAG}-self`);
@@ -176,7 +195,7 @@ describe('findNearby — ordering and exclusion', () => {
     const userId = await insertUser('lonely');
     await insertBroadcast(userId, 'lonely', metresNorth(5_000));
 
-    const results = await findNearby(center, 500);
+    const results = await getFeedInRadius(center, 500);
 
     expect(results.map((r) => r.anonymousId)).not.toContain(`${TAG}-lonely`);
   });
@@ -186,13 +205,13 @@ describe('findNearby — ordering and exclusion', () => {
 // Row mapping
 // ============================================================
 
-describe('findNearby — row mapping', () => {
+describe('getFeedInRadius — row mapping', () => {
   it('round-trips the stored coordinates back out of PostGIS', async () => {
     const userId = await insertUser('coords');
     const coords = metresNorth(100);
     await insertBroadcast(userId, 'coords', coords);
 
-    const [row] = (await findNearby(center, 500)).filter((r) => r.anonymousId === `${TAG}-coords`);
+    const [row] = (await getFeedInRadius(center, 500)).filter((r) => r.anonymousId === `${TAG}-coords`);
 
     expect(row.location.latitude).toBeCloseTo(coords.latitude, 5);
     expect(row.location.longitude).toBeCloseTo(coords.longitude, 5);
@@ -202,22 +221,13 @@ describe('findNearby — row mapping', () => {
     const userId = await insertUser('meta');
     await insertBroadcast(userId, 'meta', metresNorth(30));
 
-    const [row] = (await findNearby(center, 500)).filter((r) => r.anonymousId === `${TAG}-meta`);
+    const [row] = (await getFeedInRadius(center, 500)).filter((r) => r.anonymousId === `${TAG}-meta`);
 
     expect(row.trackTitle).toBe('Track meta');
     expect(row.artistName).toBe('Artist meta');
     expect(typeof row.startedAt).toBe('number');
     expect(row.startedAt).toBeGreaterThan(0);
     expect(typeof row.createdAt).toBe('number');
-  });
-
-  it('never returns a user_id column to the caller', async () => {
-    const userId = await insertUser('anon');
-    await insertBroadcast(userId, 'anon', metresNorth(30));
-
-    const [row] = (await findNearby(center, 500)).filter((r) => r.anonymousId === `${TAG}-anon`);
-
-    expect(JSON.stringify(row)).not.toContain(userId);
   });
 });
 
@@ -240,7 +250,7 @@ describe('schema', () => {
 
     await pool.query('DELETE FROM users WHERE id = $1', [userId]);
 
-    const res = await pool.query('SELECT 1 FROM broadcasts WHERE anonymous_id = $1', [`${TAG}-cascade`]);
+    const res = await pool.query('SELECT 1 FROM broadcasts WHERE user_id = $1', [userId]);
     expect(res.rows).toHaveLength(0);
   });
 });

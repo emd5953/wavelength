@@ -48,6 +48,9 @@ function broadcastAtPosition(pos: GeoPosition): Broadcast {
     startedAt: Date.now(),
     location: pos,
     createdAt: Date.now(),
+    trackId: "track-id",
+    isLive: true,
+    endedAt: null,
   };
 }
 

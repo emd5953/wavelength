@@ -22,14 +22,12 @@ function formatTimeSince(ms: number): string {
 
 interface BroadcastCardProps {
   broadcast: FeedBroadcast;
-  viewerAnonId: string;
   onOpenComments?: (broadcastId: string) => void;
   onOpenDM?: (recipientAnonId: string) => void;
 }
 
 export default function BroadcastCard({
   broadcast,
-  viewerAnonId,
   onOpenComments,
   onOpenDM,
 }: BroadcastCardProps) {
@@ -37,7 +35,7 @@ export default function BroadcastCard({
 
   const handleReaction = async (type: string) => {
     try {
-      const result = await addReaction(broadcast.id, viewerAnonId, type);
+      const result = await addReaction(broadcast.id, type);
       setCounts(result.counts);
     } catch {
       // silently fail
@@ -70,12 +68,20 @@ export default function BroadcastCard({
               {broadcast.artistName}
             </Text>
             <View className="flex-row items-center mt-1.5 gap-2">
-              <View className="flex-row items-center gap-1">
-                <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#DC2626' }} />
+              {broadcast.isLive ? (
+                <View
+                  className="flex-row items-center gap-1 px-2 py-0.5 rounded-lg"
+                  style={{ backgroundColor: '#DC2626' }}
+                  accessibilityLabel="Playing now"
+                >
+                  <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#fff' }} />
+                  <Text style={{ fontSize: 10, color: '#fff', fontWeight: '800' }}>LIVE</Text>
+                </View>
+              ) : (
                 <Text className="text-xs text-white/35">
-                  {formatTimeSince(broadcast.timeSinceStart)}
+                  played {formatTimeSince(Date.now() - (broadcast.endedAt ?? broadcast.startedAt))}
                 </Text>
-              </View>
+              )}
               {broadcast.tasteScore != null && broadcast.tasteScore > 0 && (
                 <View
                   className="px-2 py-0.5 rounded-lg"

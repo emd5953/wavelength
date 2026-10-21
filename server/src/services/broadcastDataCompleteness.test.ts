@@ -31,6 +31,9 @@ function buildBroadcast(
       timestamp: location.timestamp,
     },
     createdAt: Date.now(),
+    trackId: "track-id",
+    isLive: true,
+    endedAt: null,
   };
 }
 

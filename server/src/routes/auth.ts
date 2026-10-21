@@ -5,7 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import pool from '../db/connection';
-import { syncUserTaste } from '../services/tasteService';
+import { syncUserTaste, syncRepeatTracks } from '../services/tasteService';
 import type { SpotifyTokenResponse, SpotifyUserResponse } from '../types/spotify';
 
 const router = Router();
@@ -86,6 +86,7 @@ router.post('/callback', async (req: Request, res: Response) => {
 
     // Sync music taste in background
     syncUserTaste(result.rows[0].id, access_token).catch(() => {});
+    syncRepeatTracks(result.rows[0].id, access_token).catch(() => {});
 
     res.json({
       userId: result.rows[0].id,

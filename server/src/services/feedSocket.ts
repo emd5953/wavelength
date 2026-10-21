@@ -1,14 +1,12 @@
 /**
  * WebSocket layer for real-time feed updates.
- * Emits broadcast:new and broadcast:removed to nearby clients.
+ * Emits broadcast:new to nearby clients and broadcast:ended to all clients.
  * Listens for location:update to re-subscribe clients to geo channels.
  * Requirement: 4.2
  */
 
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { getBroadcastsInRadius } from './broadcastService';
 import { validateRadius } from './proximityService';
-import { cleanupSessionData } from './privacyService';
 import type { Broadcast, GeoPosition } from '../types';
 
 interface ClientState {
@@ -30,13 +28,10 @@ export function initFeedSocket(io: SocketIOServer): void {
       });
     });
 
-    socket.on('disconnect', async () => {
-      const state = clientStates.get(socket.id);
-      if (state) {
-        // Requirement 8.2: delete location data when session ends
-        await cleanupSessionData(state.userId);
-        clientStates.delete(socket.id);
-      }
+    // Plays outlive the socket (they stay in the feed for 6h), so a
+    // disconnect only forgets the client's subscription.
+    socket.on('disconnect', () => {
+      clientStates.delete(socket.id);
     });
   });
 }
@@ -46,24 +41,25 @@ export function initFeedSocket(io: SocketIOServer): void {
  * Only emits to clients whose last known location is within range.
  */
 export async function emitBroadcastNew(io: SocketIOServer, broadcast: Broadcast): Promise<void> {
+  // The real user id never leaves the server
+  const { userId, ...publicPlay } = broadcast;
+  const payload = { ...publicPlay, timeSinceStart: Date.now() - broadcast.startedAt };
+
   for (const [socketId, state] of clientStates) {
     if (isWithinRadius(state.location, broadcast.location, state.radius)) {
       // Don't send a user their own broadcast
-      if (state.userId === (broadcast as any).userId) continue;
-      io.to(socketId).emit('broadcast:new', broadcast);
+      if (state.userId === userId) continue;
+      io.to(socketId).emit('broadcast:new', payload);
     }
   }
 }
 
 /**
- * Notify all connected clients that a broadcast was removed.
+ * Notify clients that plays stopped being live. They stay in the feed as
+ * recently played; the id alone reveals nothing to clients that never saw it.
  */
-export function emitBroadcastRemoved(io: SocketIOServer, broadcastId: string, broadcastLocation: GeoPosition): void {
-  for (const [socketId, state] of clientStates) {
-    if (isWithinRadius(state.location, broadcastLocation, state.radius)) {
-      io.to(socketId).emit('broadcast:removed', broadcastId);
-    }
-  }
+export function emitPlaysEnded(io: SocketIOServer, playIds: string[]): void {
+  for (const id of playIds) io.emit('broadcast:ended', id);
 }
 
 /** Haversine distance check */

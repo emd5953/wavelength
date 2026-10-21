@@ -192,7 +192,7 @@ describe('POST /connections/requests', () => {
     expect(svc.sendRequest).toHaveBeenCalledWith(USER_ID, OTHER_ID);
   });
 
-  it('returns 404 when the broadcast has ended', async () => {
+  it('returns 404 when the listener is no longer in the feed', async () => {
     const app = await buildApp();
     svc.resolveAnonId.mockResolvedValue(null);
 
@@ -201,7 +201,7 @@ describe('POST /connections/requests', () => {
     });
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toContain('no longer active');
+    expect(res.body.error).toContain('no longer in the feed');
     expect(svc.sendRequest).not.toHaveBeenCalled();
   });
 

@@ -46,6 +46,9 @@ function makeBroadcastEntry(userId: string, location: GeoPosition): { broadcast:
       startedAt: Date.now(),
       location,
       createdAt: Date.now(),
+      trackId: "track-id",
+      isLive: true,
+      endedAt: null,
     },
   };
 }

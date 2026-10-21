@@ -7,7 +7,7 @@ import { GPSModule } from '../src/services/gps';
 import { fetchNearbyFeed, FeedBroadcast } from '../src/services/api';
 import { connectFeedSocket, sendLocationUpdate, disconnectFeedSocket } from '../src/services/feedSocket';
 import { SpotifyAuthModule } from '../src/services/spotifyAuth';
-import { startPolling, stopPolling } from '../src/services/spotifyPoller';
+import { startPresence, stopPresence } from '../src/services/presence';
 import { startBackgroundLocation } from '../src/services/backgroundLocation';
 import { registerForPushNotifications } from '../src/services/pushNotifications';
 import BroadcastCard from '../src/components/BroadcastCard';
@@ -17,6 +17,11 @@ import { RADIUS_KEY } from './profile';
 
 const POLL_INTERVAL = 10_000;
 type ViewMode = 'list' | 'map';
+
+/** Live plays first, then most recently started. Mirrors the server's order. */
+function sortFeed(items: FeedBroadcast[]): FeedBroadcast[] {
+  return [...items].sort((a, b) => Number(b.isLive) - Number(a.isLive) || b.startedAt - a.startedAt);
+}
 
 export default function NearbyFeedScreen() {
   const router = useRouter();
@@ -46,7 +51,7 @@ export default function NearbyFeedScreen() {
       const savedRadius = await SecureStore.getItemAsync(RADIUS_KEY);
       const radius = savedRadius ? Number(savedRadius) : 100;
       const data = await fetchNearbyFeed(pos.latitude, pos.longitude, radius);
-      setBroadcasts(data.broadcasts);
+      setBroadcasts(sortFeed(data.broadcasts));
       setError(null);
       sendLocationUpdate(userId.current, pos.latitude, pos.longitude, radius);
 
@@ -68,27 +73,29 @@ export default function NearbyFeedScreen() {
 
   useEffect(() => {
     connectFeedSocket({
+      // A resumed play arrives again with the same id, so replace rather than skip
       onBroadcastNew: (broadcast) => {
-        setBroadcasts((prev) => {
-          if (prev.some((b) => b.id === broadcast.id)) return prev;
-          return [broadcast, ...prev];
-        });
+        setBroadcasts((prev) => sortFeed([broadcast, ...prev.filter((b) => b.id !== broadcast.id)]));
       },
-      onBroadcastRemoved: (broadcastId) => {
-        setBroadcasts((prev) => prev.filter((b) => b.id !== broadcastId));
+      onBroadcastEnded: (broadcastId) => {
+        setBroadcasts((prev) =>
+          sortFeed(prev.map((b) => (b.id === broadcastId ? { ...b, isLive: false, endedAt: Date.now() } : b))),
+        );
       },
     });
     loadFeed();
-    startPolling();
+    startPresence();
     startBackgroundLocation().catch(() => {});
     registerForPushNotifications().catch(() => {});
     const interval = setInterval(loadFeed, POLL_INTERVAL);
     return () => {
       clearInterval(interval);
-      stopPolling();
+      stopPresence();
       disconnectFeedSocket();
     };
   }, [loadFeed]);
+
+  const liveCount = broadcasts.filter((b) => b.isLive).length;
 
   const header = (
     <LinearGradient colors={['#DC2626', '#B91C1C', '#1a0a0a']} locations={[0, 0.5, 1]}>
@@ -98,7 +105,7 @@ export default function NearbyFeedScreen() {
           <View>
             <Text className="text-3xl font-extrabold text-white tracking-tight">Nearby</Text>
             <Text className="text-xs text-white/50 mt-1">
-              {broadcasts.length} {broadcasts.length === 1 ? 'listener' : 'listeners'} around you
+              {liveCount} playing now · {broadcasts.length - liveCount} recently
             </Text>
           </View>
           <View className="flex-row gap-2">
@@ -190,9 +197,9 @@ export default function NearbyFeedScreen() {
         {header}
         <View className="flex-1 justify-center items-center px-8">
           <Text style={{ fontSize: 48 }}>🔇</Text>
-          <Text className="text-lg font-bold text-white text-center mt-4">No listeners nearby</Text>
+          <Text className="text-lg font-bold text-white text-center mt-4">Nothing played nearby yet</Text>
           <Text className="text-sm text-white/50 text-center mt-2 leading-5">
-            When someone near you plays music on Spotify, it'll show up here in real time.
+            Songs played around you in the last 6 hours show up here, and what's playing right now goes on top.
           </Text>
         </View>
       </View>
@@ -211,7 +218,6 @@ export default function NearbyFeedScreen() {
           renderItem={({ item }) => (
             <BroadcastCard
               broadcast={item}
-              viewerAnonId={userId.current}
               onOpenComments={(id) => router.push(`/comment-thread?broadcastId=${id}`)}
               onOpenDM={(anonId) => router.push(`/dm?recipientAnonId=${anonId}`)}
             />

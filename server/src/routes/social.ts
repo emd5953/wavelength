@@ -1,22 +1,38 @@
 /**
  * Social interactions API routes — reactions, comments, DMs.
  * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
+ *
+ * The actor's anonymous id always comes from their listening session, derived
+ * from `req.userId`. Any viewerAnonId / authorAnonId / senderAnonId in the body
+ * is ignored, so a client can neither choose nor spoof its own identity.
  */
 
 import { Router, Request, Response } from 'express';
 import { addReaction, getReactionCounts, addComment, getComments, sendDM, getDMThread } from '../services/socialService';
+import { getOrCreateOpenSession, resolveAnonId } from '../services/sessionService';
 import type { ReactionType } from '../types';
 
 const router = Router();
 
 const VALID_REACTIONS: ReactionType[] = ['fire', 'heart', 'headphones', 'clap', 'surprised'];
 
-/** POST /social/reactions — add a reaction to a broadcast */
-router.post('/reactions', async (req: Request, res: Response) => {
-  const { broadcastId, viewerAnonId, type } = req.body;
+const PLAY_GONE = 'That play is no longer in the feed';
 
-  if (!broadcastId || !viewerAnonId || !type) {
-    res.status(400).json({ error: 'broadcastId, viewerAnonId, and type are required' });
+/**
+ * A reaction or comment on a play that has expired (or never existed) fails
+ * the broadcast_id foreign key (23503) or the UUID cast (22P02).
+ */
+function isMissingPlay(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  return code === '23503' || code === '22P02';
+}
+
+/** POST /social/reactions — add a reaction to a play */
+router.post('/reactions', async (req: Request, res: Response) => {
+  const { broadcastId, type } = req.body;
+
+  if (!broadcastId || !type) {
+    res.status(400).json({ error: 'broadcastId and type are required' });
     return;
   }
 
@@ -26,9 +42,14 @@ router.post('/reactions', async (req: Request, res: Response) => {
   }
 
   try {
-    const counts = await addReaction(broadcastId, viewerAnonId, type);
+    const { anonymousId } = await getOrCreateOpenSession(req.userId!);
+    const counts = await addReaction(broadcastId, anonymousId, type);
     res.json({ counts });
   } catch (err) {
+    if (isMissingPlay(err)) {
+      res.status(404).json({ error: PLAY_GONE });
+      return;
+    }
     console.error('Add reaction error:', err);
     res.status(500).json({ error: 'Failed to add reaction' });
   }
@@ -45,25 +66,30 @@ router.get('/reactions/:broadcastId', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /social/comments — add a comment to a broadcast */
+/** POST /social/comments — add a comment to a play */
 router.post('/comments', async (req: Request, res: Response) => {
-  const { broadcastId, authorAnonId, text } = req.body;
+  const { broadcastId, text } = req.body;
 
-  if (!broadcastId || !authorAnonId || !text) {
-    res.status(400).json({ error: 'broadcastId, authorAnonId, and text are required' });
+  if (!broadcastId || !text) {
+    res.status(400).json({ error: 'broadcastId and text are required' });
     return;
   }
 
   try {
-    const comment = await addComment(broadcastId, authorAnonId, text);
+    const { anonymousId } = await getOrCreateOpenSession(req.userId!);
+    const comment = await addComment(broadcastId, anonymousId, text);
     res.json({ comment });
   } catch (err) {
+    if (isMissingPlay(err)) {
+      res.status(404).json({ error: PLAY_GONE });
+      return;
+    }
     console.error('Add comment error:', err);
     res.status(500).json({ error: 'Failed to add comment' });
   }
 });
 
-/** GET /social/comments/:broadcastId — get comments for a broadcast */
+/** GET /social/comments/:broadcastId — get comments for a play */
 router.get('/comments/:broadcastId', async (req: Request, res: Response) => {
   try {
     const comments = await getComments(req.params.broadcastId);
@@ -74,17 +100,22 @@ router.get('/comments/:broadcastId', async (req: Request, res: Response) => {
   }
 });
 
-/** POST /social/dms — send a DM to an anonymous user */
+/** POST /social/dms — send a DM to an anonymous listener */
 router.post('/dms', async (req: Request, res: Response) => {
-  const { senderAnonId, recipientAnonId, text, includesConnectionRequest } = req.body;
+  const { recipientAnonId, text, includesConnectionRequest } = req.body;
 
-  if (!senderAnonId || !recipientAnonId || !text) {
-    res.status(400).json({ error: 'senderAnonId, recipientAnonId, and text are required' });
+  if (!recipientAnonId || !text) {
+    res.status(400).json({ error: 'recipientAnonId and text are required' });
     return;
   }
 
   try {
-    const dm = await sendDM(senderAnonId, recipientAnonId, text, !!includesConnectionRequest);
+    if (!(await resolveAnonId(recipientAnonId))) {
+      res.status(404).json({ error: 'That listener is no longer in the feed' });
+      return;
+    }
+    const { anonymousId } = await getOrCreateOpenSession(req.userId!);
+    const dm = await sendDM(anonymousId, recipientAnonId, text, !!includesConnectionRequest);
     res.json({ dm });
   } catch (err) {
     console.error('Send DM error:', err);
@@ -92,10 +123,10 @@ router.post('/dms', async (req: Request, res: Response) => {
   }
 });
 
-/** GET /social/dms/:participantA/:participantB — get DM thread between two anonymous users */
-router.get('/dms/:participantA/:participantB', async (req: Request, res: Response) => {
+/** GET /social/dms/:otherAnonId — the caller's DM thread with another listener */
+router.get('/dms/:otherAnonId', async (req: Request, res: Response) => {
   try {
-    const thread = await getDMThread(req.params.participantA, req.params.participantB);
+    const thread = await getDMThread(req.userId!, req.params.otherAnonId);
     res.json({ messages: thread });
   } catch (err) {
     console.error('Get DM thread error:', err);
