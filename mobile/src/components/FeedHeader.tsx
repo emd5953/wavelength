@@ -1,20 +1,15 @@
 import { useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, Text, Animated, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, TextButton } from './ui';
-
-export type ViewMode = 'list' | 'map';
+import { COLORS } from './ui';
 
 interface FeedHeaderProps {
   topInset: number;
+  title: string;
   /** Album art of the newest live play; the header falls back to a plain gradient without it. */
   artUrl: string | null;
   liveCount: number;
   earlierCount: number;
-  viewMode: ViewMode;
-  onChangeViewMode: (mode: ViewMode) => void;
-  onOpenPeople: () => void;
-  onOpenProfile: () => void;
 }
 
 const GROUND = COLORS.ground;
@@ -55,49 +50,14 @@ function ArtBackdrop({ artUrl }: { artUrl: string | null }) {
   );
 }
 
-export default function FeedHeader({
-  topInset,
-  artUrl,
-  liveCount,
-  earlierCount,
-  viewMode,
-  onChangeViewMode,
-  onOpenPeople,
-  onOpenProfile,
-}: FeedHeaderProps) {
+export default function FeedHeader({ topInset, title, artUrl, liveCount, earlierCount }: FeedHeaderProps) {
   return (
     <View style={{ paddingTop: topInset + 12 }} className="px-6 pb-5 overflow-hidden">
       <ArtBackdrop artUrl={artUrl} />
-
-      <View className="flex-row items-start justify-between">
-        <View>
-          <Text className="font-mono-light text-[32px] text-ink">nearby</Text>
-          <Text className="font-mono text-[13px] text-ink-dim mt-1">
-            {liveCount} playing now · {earlierCount} earlier
-          </Text>
-        </View>
-        <View className="flex-row gap-5 pt-2">
-          <TextButton label="people" onPress={onOpenPeople} accessibilityLabel="Connections" />
-          <TextButton label="you" onPress={onOpenProfile} accessibilityLabel="Profile" />
-        </View>
-      </View>
-
-      <View className="flex-row gap-1 mt-5">
-        {(['list', 'map'] as const).map((mode) => {
-          const selected = viewMode === mode;
-          return (
-            <TouchableOpacity
-              key={mode}
-              className={`px-4 py-1.5 rounded-full ${selected ? 'bg-card border border-rule' : ''}`}
-              onPress={() => onChangeViewMode(mode)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-            >
-              <Text className={`font-mono text-[13px] ${selected ? 'text-ink' : 'text-ink-dim'}`}>{mode}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <Text className="font-mono-light text-[32px] text-ink">{title}</Text>
+      <Text className="font-mono text-[13px] text-ink-dim mt-1">
+        {liveCount} playing now · {earlierCount} earlier
+      </Text>
     </View>
   );
 }

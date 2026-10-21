@@ -233,22 +233,27 @@ mobile/
 │   ├── _layout.tsx             # Stack, header styles, font loading, LinearGradient interop
 │   ├── index.tsx               # Login (redirects to onboarding / feed)
 │   ├── onboarding.tsx
-│   ├── nearby-feed.tsx         # Feed: data, sockets, presence, sections
+│   ├── (tabs)/                 # Bottom tab bar: nearby · map · people · you
+│   │   ├── _layout.tsx         # Tabs + NearbyFeedProvider (one feed subscription for both feed tabs)
+│   │   ├── nearby-feed.tsx     # nearby: PLAYING NOW / EARLIER list
+│   │   ├── map.tsx             # map: same plays as pins
+│   │   ├── connections.tsx     # people: requests card + connections
+│   │   └── profile.tsx         # you: radius slider, log out, delete account
 │   ├── comment-thread.tsx · dm.tsx
-│   ├── connections.tsx · connection-detail.tsx · connection-requests.tsx
-│   ├── profile.tsx             # Radius slider, log out, delete account
+│   ├── connection-detail.tsx · connection-requests.tsx
 │   └── location-required.tsx
 ├── assets/fonts/paper-mono/    # Paper Mono, SIL OFL 1.1
 └── src/
     ├── components/
     │   ├── ui.tsx              # Design-system primitives + COLORS
     │   ├── Conversation.tsx    # Bubbles + composer (comments, DMs)
-    │   ├── FeedHeader.tsx      # Blurred-art header, counts, nav, list/map toggle
+    │   ├── FeedHeader.tsx      # Blurred-art header with title and live/earlier counts
     │   ├── BroadcastCard.tsx · FeedMap.tsx
     │   └── Connection*Screen.tsx · CommentThread.tsx · DMScreen.tsx
     ├── config/spotify.ts       # OAuth config
     └── services/
         ├── api.ts              # REST client (authFetch)
+        ├── nearbyFeed.tsx      # Feed provider: polling, socket, presence, background location
         ├── presence.ts         # 60s heartbeat while foregrounded; caches my anonymous ID
         ├── feedSocket.ts       # broadcast:new / broadcast:ended
         ├── gps.ts · backgroundLocation.ts · pushNotifications.ts

@@ -148,10 +148,15 @@ On a started play P by listener L:
   → send Expo push only to the rows actually claimed (once per pair+track, ever)
 ```
 
-## 7. Nearby Feed (`app/nearby-feed.tsx`)
+## 7. Nearby Feed (`app/(tabs)/`)
+
+The four main screens are tabs: **nearby · map · people · you**
+(Feather line icons, lowercase mono labels). `NearbyFeedProvider`
+(`src/services/nearbyFeed.tsx`) wraps the tab group and owns the feed, so
+nearby and map share one subscription.
 
 ```
-Feed mounts
+Tab group mounts (NearbyFeedProvider)
   ├─ Connect socket
   │     ├─ broadcast:new   → insert, or replace by ID (resumed plays come back live)
   │     └─ broadcast:ended → mark isLive:false, endedAt:now
@@ -162,12 +167,11 @@ Feed mounts
   ├─ startPresence()  ·  startBackgroundLocation()  ·  registerForPushNotifications()
   │
   └─ Render
-        ├─ FeedHeader: newest live play's art, blurred + darkened
-        │     "nearby" · "N playing now · M earlier" · people / you · list / map
-        ├─ list: SectionList of PLAYING NOW, then EARLIER (empty sections hidden)
-        │     └─ BroadcastCard: art, track, artist, live dot / "12m ago",
-        │        "· 42% match", 5 reactions, comment / message
-        └─ map: FeedMap, dark style, bright pins live / darker pins earlier
+        ├─ nearby tab: FeedHeader (newest live art, blurred; "N playing now · M earlier")
+        │     └─ SectionList of PLAYING NOW, then EARLIER (empty sections hidden)
+        │          └─ BroadcastCard: art, track, artist, live dot / "12m ago",
+        │             "· 42% match", 5 reactions, comment / message
+        └─ map tab: same header + FeedMap (dark style, bright pins live / darker earlier)
 ```
 
 ### Server side
@@ -304,20 +308,17 @@ Account delete  DMs for all session IDs, then the user row (cascade)
 ## Screen Navigation Map
 
 ```
-/onboarding ──▶ / (login)
-                  │
-                  ▼
-            /nearby-feed ◀────────────────────────┐
-              │   │   │                            │
-              │   │   ├──▶ /comment-thread?broadcastId=X
-              │   │   ├──▶ /dm?recipientAnonId=X   │
-              │   │   └──▶ /profile ("you") ───────┘
-              │   │          ├─ log out → /
-              │   │          └─ delete account → /
-              │   │
-              │   └──▶ /connections ("people")
-              │          ├──▶ /connection-requests  ("requests" card)
-              │          └──▶ /connection-detail?connectionId=X
-              │
-              └──▶ /location-required  (permission not granted)
+/onboarding ──▶ / (login) ──▶ tabs
+                                ┌──────────┬──────┬──────────────┬────────────┐
+                                │ nearby   │ map  │ people       │ you        │
+                                │ /nearby- │ /map │ /connections │ /profile   │
+                                │  feed    │      │              │            │
+                                └────┬─────┴──────┴──────┬───────┴─────┬──────┘
+                                     │                   │             ├─ log out → /
+       /comment-thread?broadcastId=X ◀┤                   │             └─ delete account → /
+       /dm?recipientAnonId=X         ◀┘                   │
+                         /connection-requests ("requests" card) ◀┤
+                         /connection-detail?connectionId=X       ◀┘
+
+any feed refresh without location permission ──▶ /location-required
 ```

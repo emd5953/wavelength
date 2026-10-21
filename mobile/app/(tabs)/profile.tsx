@@ -4,12 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import Slider from '@react-native-community/slider';
-import { SpotifyAuthModule } from '../src/services/spotifyAuth';
-import { ONBOARDING_KEY } from './onboarding';
-import { Screen, SectionLabel, OutlineButton, TextButton, Spinner, COLORS } from '../src/components/ui';
+import { SpotifyAuthModule } from '../../src/services/spotifyAuth';
+import { RADIUS_KEY } from '../../src/services/nearbyFeed';
+import { ONBOARDING_KEY } from '../onboarding';
+import { Screen, SectionLabel, OutlineButton, TextButton, Spinner, COLORS } from '../../src/components/ui';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-const RADIUS_KEY = 'discovery_radius';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -80,9 +80,7 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}
         className="px-6"
       >
-        <TextButton label="← back" onPress={() => router.back()} accessibilityLabel="Go back" />
-
-        <Text className="font-mono text-[15px] text-ink-dim mt-10">you are</Text>
+        <Text className="font-mono text-[15px] text-ink-dim mt-6">you are</Text>
         <Text className="font-mono-light text-[32px] text-ink mt-1" numberOfLines={1}>
           {(profile?.display_name || 'a listener').toLowerCase()}
         </Text>
@@ -130,4 +128,3 @@ export default function ProfileScreen() {
   );
 }
 
-export { RADIUS_KEY };

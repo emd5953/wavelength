@@ -24,6 +24,16 @@ export function Screen({ className = '', ...props }: ViewProps & { className?: s
   return <View className={`flex-1 bg-ground ${className}`} {...props} />;
 }
 
+/** Large light page title for tab screens, matching the feed header. */
+export function PageTitle({ title, subtitle, topInset }: { title: string; subtitle?: string; topInset: number }) {
+  return (
+    <View style={{ paddingTop: topInset + 12 }} className="px-6 pb-4">
+      <Text className="font-mono-light text-[32px] text-ink">{title}</Text>
+      {subtitle ? <Text className="font-mono text-[13px] text-ink-dim mt-1">{subtitle}</Text> : null}
+    </View>
+  );
+}
+
 /** Translucent card: no shadow, hairline border. */
 export function Card({ className = '', ...props }: ViewProps & { className?: string }) {
   return <View className={`rounded-[14px] bg-card border border-rule ${className}`} {...props} />;

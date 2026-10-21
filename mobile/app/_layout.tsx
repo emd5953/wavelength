@@ -41,14 +41,12 @@ export default function RootLayout() {
     >
       <Stack.Screen name="onboarding" options={{ title: 'Welcome', headerShown: false }} />
       <Stack.Screen name="index" options={{ title: 'Wavelength', headerShown: false }} />
-      <Stack.Screen name="nearby-feed" options={{ title: 'Nearby', headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="comment-thread" options={{ title: 'comments' }} />
       <Stack.Screen name="dm" options={{ title: 'message' }} />
-      <Stack.Screen name="connections" options={{ title: 'people' }} />
       <Stack.Screen name="connection-detail" options={{ title: 'profile' }} />
       <Stack.Screen name="connection-requests" options={{ title: 'requests' }} />
       <Stack.Screen name="location-required" options={{ title: 'location', headerShown: false }} />
-      <Stack.Screen name="profile" options={{ title: 'Profile', headerShown: false }} />
     </Stack>
   );
 }
