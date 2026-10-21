@@ -191,6 +191,20 @@ export function More(p: IconProps) {
   );
 }
 
+/** location — a dropped pin, a little rounder than usual. */
+export function Pin(p: IconProps) {
+  return (
+    <Frame size={p.size}>
+      <Path
+        d="M12 21 C8.6 17.2 5.6 13.9 5.6 10.1 C5.6 6.4 8.4 3.6 12 3.6 C15.6 3.6 18.4 6.4 18.4 10.1 C18.4 13.9 15.4 17.2 12 21 Z"
+        fill={fillIf(p)}
+        {...stroke(p)}
+      />
+      <Circle cx={12} cy={10.1} r={2.3} {...stroke(p)} />
+    </Frame>
+  );
+}
+
 /** earlier — a clock face, hands at a lazy ten past. */
 export function Clock(p: IconProps) {
   return (

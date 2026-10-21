@@ -8,12 +8,12 @@ import { useNearbyFeed, rememberPlay } from '../../src/services/nearbyFeed';
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { broadcasts, userLocation } = useNearbyFeed();
+  const { broadcasts, userLocation, placeName } = useNearbyFeed();
   const live = broadcasts.filter((b) => b.isLive);
 
   return (
     <View className="flex-1 bg-ground">
-      <MarkHeader topInset={insets.top} liveCount={live.length} />
+      <MarkHeader topInset={insets.top} liveCount={live.length} place={placeName} />
       <FeedMap
         broadcasts={broadcasts}
         userLocation={userLocation}

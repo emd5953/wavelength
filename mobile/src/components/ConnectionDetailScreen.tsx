@@ -93,7 +93,9 @@ export default function ConnectionDetailScreen({
         {items.map((item, i) => (
           <View key={i} className={`flex-row py-3 ${i < items.length - 1 ? 'border-b border-rule' : ''}`}>
             <Text className="font-mono text-[13px] text-ink-dim w-8">{String(i + 1).padStart(2, '0')}</Text>
-            <Text className="font-mono text-[14px] text-ink flex-1" numberOfLines={1}>{item}</Text>
+            <Text className="font-mono text-[14px] text-ink flex-1" numberOfLines={1}>
+              {item}
+            </Text>
           </View>
         ))}
       </View>
@@ -109,23 +111,44 @@ export default function ConnectionDetailScreen({
           </Text>
         </View>
 
-        <View className="flex-row justify-center gap-6 mt-10">
-          <PressableScale
-            scaleTo={0.9}
-            onPress={onMessage}
-            accessibilityLabel="Message"
-            style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Note size={30} color={COLORS.ink} />
-          </PressableScale>
-          <PressableScale
-            scaleTo={0.9}
-            onPress={handleOpenSpotify}
-            accessibilityLabel="Open Spotify profile"
-            style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: COLORS.rule, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Link size={28} color={COLORS.ink} />
-          </PressableScale>
+        <View className="flex-row justify-center gap-8 mt-10">
+          <View className="items-center">
+            <PressableScale
+              scaleTo={0.9}
+              onPress={onMessage}
+              accessibilityLabel="Message"
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                backgroundColor: COLORS.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Note size={30} color={COLORS.ink} />
+            </PressableScale>
+            <Text className="font-mono text-[12px] text-ink-muted mt-2">message</Text>
+          </View>
+          <View className="items-center">
+            <PressableScale
+              scaleTo={0.9}
+              onPress={handleOpenSpotify}
+              accessibilityLabel="Open Spotify profile"
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                borderWidth: 1,
+                borderColor: COLORS.rule,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Link size={28} color={COLORS.ink} />
+            </PressableScale>
+            <Text className="font-mono text-[12px] text-ink-muted mt-2">spotify</Text>
+          </View>
         </View>
 
         {list('TOP ARTISTS', profile.topArtists)}

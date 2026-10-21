@@ -7,6 +7,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import * as Location from 'expo-location';
 import { GPSModule } from './gps';
 import { fetchNearbyFeed, type FeedBroadcast } from './api';
 import { connectFeedSocket, sendLocationUpdate, disconnectFeedSocket } from './feedSocket';
@@ -29,7 +30,32 @@ interface NearbyFeed {
   loading: boolean;
   error: string | null;
   userLocation: { latitude: number; longitude: number } | null;
+  /** Neighborhood (or street, or city) you're in, lowercase; null until known. */
+  placeName: string | null;
   reload: () => void;
+}
+
+/**
+ * The most specific useful name for where you are: a landmark or place
+ * ("times square"), else the street ("7th ave"), else the district. `name`
+ * is skipped when it's just a street address ("1560 Broadway").
+ */
+function placeLabel(place: Location.LocationGeocodedAddress): string | null {
+  const looksLikeAddress = !!place.name && (/^\d/.test(place.name) || place.name === place.street);
+  const label = (!looksLikeAddress && place.name) || place.street || place.district || place.city;
+  return label ? label.toLowerCase() : null;
+}
+
+/** Re-geocode only after moving this far, not on every 10s refresh. */
+const PLACE_REFRESH_METERS = 200;
+
+function metersBetween(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
+  const R = 6_371_000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 const NearbyFeedContext = createContext<NearbyFeed | null>(null);
@@ -53,7 +79,20 @@ export function NearbyFeedProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [placeName, setPlaceName] = useState<string | null>(null);
+  const placedAt = useRef<{ latitude: number; longitude: number } | null>(null);
   const userId = useRef<string>('');
+
+  useEffect(() => {
+    if (!userLocation) return;
+    if (placedAt.current && metersBetween(placedAt.current, userLocation) < PLACE_REFRESH_METERS) return;
+    placedAt.current = userLocation;
+    Location.reverseGeocodeAsync(userLocation)
+      .then(([place]) => {
+        if (place) setPlaceName(placeLabel(place));
+      })
+      .catch(() => {});
+  }, [userLocation]);
 
   useEffect(() => {
     SpotifyAuthModule.getStoredTokens().then((tokens) => {
@@ -118,7 +157,7 @@ export function NearbyFeedProvider({ children }: { children: ReactNode }) {
   }, [loadFeed]);
 
   return (
-    <NearbyFeedContext.Provider value={{ broadcasts, loading, error, userLocation, reload: loadFeed }}>
+    <NearbyFeedContext.Provider value={{ broadcasts, loading, error, userLocation, placeName, reload: loadFeed }}>
       {children}
     </NearbyFeedContext.Provider>
   );

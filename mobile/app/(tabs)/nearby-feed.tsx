@@ -31,7 +31,7 @@ export default function NearbyFeedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { broadcasts, loading, error, reload } = useNearbyFeed();
+  const { broadcasts, loading, error, reload, placeName } = useNearbyFeed();
   const live = broadcasts.filter((b) => b.isLive);
   const earlier = broadcasts.filter((b) => !b.isLive);
   const big = (width - EDGE * 2 - GUTTER) / 2;
@@ -42,7 +42,7 @@ export default function NearbyFeedScreen() {
     router.push(`/play?broadcastId=${b.id}`);
   };
 
-  const header = <MarkHeader topInset={insets.top} liveCount={live.length} />;
+  const header = <MarkHeader topInset={insets.top} liveCount={live.length} place={placeName} />;
 
   if (loading) {
     return (

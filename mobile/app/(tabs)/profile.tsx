@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Alert, ScrollView, ActionSheetIOS } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -24,8 +24,8 @@ function Ring({ fraction }: { fraction: number }) {
   return <Animated.View style={[{ position: 'absolute', borderWidth: 1, borderColor: COLORS.rule }, style]} />;
 }
 
-/** The discovery radius as rings around you; meters appear only while dragging. */
-function RadiusRings({ radius, showLabel }: { radius: number; showLabel: boolean }) {
+/** The discovery radius as rings around you. */
+function RadiusRings({ radius }: { radius: number }) {
   // 50m still reads as a real circle; 500m fills the box
   const f = 0.35 + 0.65 * ((radius - 50) / 450);
   return (
@@ -34,16 +34,6 @@ function RadiusRings({ radius, showLabel }: { radius: number; showLabel: boolean
       <Ring fraction={f * 0.66} />
       <Ring fraction={f * 0.33} />
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.live }} />
-      {showLabel && (
-        <Animated.Text
-          entering={FadeIn.duration(120)}
-          exiting={FadeOut.duration(200)}
-          className="font-mono text-[13px] text-ink-muted"
-          style={{ position: 'absolute', bottom: 6 }}
-        >
-          {radius}m
-        </Animated.Text>
-      )}
     </View>
   );
 }
@@ -56,7 +46,6 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState(100);
-  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -128,6 +117,7 @@ export default function ProfileScreen() {
     <Screen>
       <MarkHeader
         topInset={insets.top}
+        title="you"
         right={
           <PressableScale scaleTo={0.88} onPress={openMore} accessibilityLabel="Account options">
             <More size={28} color={COLORS.inkMuted} />
@@ -140,7 +130,10 @@ export default function ProfileScreen() {
           <Text className="font-mono-light text-[24px] text-ink mt-4">{name.toLowerCase()}</Text>
         </View>
 
-        <RadiusRings radius={radius} showLabel={dragging} />
+        <RadiusRings radius={radius} />
+        <Text className="font-mono text-[13px] text-ink-muted -mt-2 mb-3">
+          {radius}m <Text className="text-ink-dim">· radius</Text>
+        </Text>
 
         <View style={{ width: '82%' }}>
           <Slider
@@ -149,10 +142,8 @@ export default function ProfileScreen() {
             maximumValue={500}
             step={50}
             value={radius}
-            onSlidingStart={() => setDragging(true)}
             onValueChange={(val) => setRadius(val)}
             onSlidingComplete={async (val) => {
-              setDragging(false);
               setRadius(val);
               await SecureStore.setItemAsync(RADIUS_KEY, String(val));
             }}

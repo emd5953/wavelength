@@ -22,7 +22,11 @@ const EDGE = 20;
 const GAP = 18;
 
 /** People as faces: a grid of avatars. Requests are a badge, not a line of text. */
-export default function ConnectionsListScreen({ userId, onSelectConnection, onOpenRequests }: ConnectionsListScreenProps) {
+export default function ConnectionsListScreen({
+  userId,
+  onSelectConnection,
+  onOpenRequests,
+}: ConnectionsListScreenProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [connections, setConnections] = useState<ConnectionListItem[]>([]);
@@ -52,27 +56,32 @@ export default function ConnectionsListScreen({ userId, onSelectConnection, onOp
       onPress={onOpenRequests}
       accessibilityLabel={incomingCount ? `${incomingCount} connection requests waiting` : 'Connection requests'}
     >
-      <View>
-        <Pair size={28} color={incomingCount ? COLORS.ink : COLORS.inkDim} />
-        {incomingCount > 0 && (
-          <Animated.View
-            entering={ZoomIn.springify()}
-            style={{
-              position: 'absolute',
-              top: -4,
-              right: -6,
-              minWidth: 16,
-              height: 16,
-              borderRadius: 8,
-              paddingHorizontal: 4,
-              backgroundColor: COLORS.live,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text className="font-mono-medium text-[10px]" style={{ color: COLORS.night }}>{incomingCount}</Text>
-          </Animated.View>
-        )}
+      <View className="flex-row items-center">
+        <Text className={`font-mono text-[12px] mr-2 ${incomingCount ? 'text-ink' : 'text-ink-dim'}`}>requests</Text>
+        <View>
+          <Pair size={26} color={incomingCount ? COLORS.ink : COLORS.inkDim} />
+          {incomingCount > 0 && (
+            <Animated.View
+              entering={ZoomIn.springify()}
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -6,
+                minWidth: 16,
+                height: 16,
+                borderRadius: 8,
+                paddingHorizontal: 4,
+                backgroundColor: COLORS.live,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text className="font-mono-medium text-[10px]" style={{ color: COLORS.night }}>
+                {incomingCount}
+              </Text>
+            </Animated.View>
+          )}
+        </View>
       </View>
     </PressableScale>
   );
@@ -81,7 +90,7 @@ export default function ConnectionsListScreen({ userId, onSelectConnection, onOp
 
   return (
     <View className="flex-1 bg-ground">
-      <MarkHeader topInset={insets.top} right={requests} />
+      <MarkHeader topInset={insets.top} title="people" right={requests} />
       <FlatList
         data={connections}
         keyExtractor={(item) => item.id}
@@ -89,8 +98,16 @@ export default function ConnectionsListScreen({ userId, onSelectConnection, onOp
         columnWrapperStyle={{ gap: GAP, paddingHorizontal: EDGE }}
         contentContainerStyle={{ gap: 22, paddingTop: 16, paddingBottom: 24 }}
         renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * STAGGER).springify().damping(16)} style={{ width: cell }}>
-            <PressableScale onPress={() => onSelectConnection(item.id)} accessibilityLabel={`View profile of ${item.displayName}`}>
+          <Animated.View
+            entering={FadeInDown.delay(index * STAGGER)
+              .springify()
+              .damping(16)}
+            style={{ width: cell }}
+          >
+            <PressableScale
+              onPress={() => onSelectConnection(item.id)}
+              accessibilityLabel={`View profile of ${item.displayName}`}
+            >
               <View className="items-center">
                 <Avatar uri={item.profileImageUrl} name={item.displayName} size={cell * 0.78} />
                 <Text className="font-mono text-[12px] text-ink-muted mt-2" numberOfLines={1}>
